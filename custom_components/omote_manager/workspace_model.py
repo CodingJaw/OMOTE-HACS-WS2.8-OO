@@ -286,19 +286,31 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
                     if not isinstance(prefix, str):
                         issues.append(_issue("error", path, "CommandPrefix must be text"))
                         prefix = ""
-                    for widget in page.get("Widgets", []):
+                    widgets = page.get("Widgets", [])
+                    if not isinstance(widgets, list):
+                        issues.append(_issue("error", page_path, "Widgets must be an array"))
+                        widgets = []
+                    for widget in widgets:
                         if not isinstance(widget, dict) or "Command" not in widget:
                             continue
                         cmds = widget["Command"]
                         for cmd in (cmds if isinstance(cmds, list) else [cmds]):
                             ensure_command(page_path, checked, prefix + str(cmd))
-                    for event_map in page.get("ButtonMaps", {}).values():
+                    button_maps = page.get("ButtonMaps", {})
+                    if not isinstance(button_maps, dict):
+                        issues.append(_issue("error", page_path, "ButtonMaps must be an object"))
+                        button_maps = {}
+                    for event_map in button_maps.values():
                         if isinstance(event_map, dict):
                             for cmd in event_map.values():
                                 if isinstance(cmd, str):
                                     ensure_command(page_path, checked, prefix + cmd)
         for sequence in ("StartCommandSequence", "ExitCommandSequence"):
-            for command in doc.get(sequence, []):
+            actions = doc.get(sequence, [])
+            if not isinstance(actions, list):
+                issues.append(_issue("error", path, f"{sequence} must be an array"))
+                continue
+            for command in actions:
                 if not isinstance(command, dict):
                     issues.append(_issue("error", path, f"{sequence} entry must be an object"))
                     continue
@@ -353,7 +365,10 @@ def extract_scene_template(files: dict[str, str], scene_path: str) -> tuple[dict
     if not isinstance(scene, dict):
         raise WorkspaceError("Scene must be an object")
     paths = {scene_path}
-    for item in scene.get("Pages", []):
+    pages = scene.get("Pages", [])
+    if not isinstance(pages, list):
+        raise WorkspaceError("Scene Pages must be an array")
+    for item in pages:
         if not isinstance(item, dict) or not isinstance(item.get("FileName"), str):
             raise WorkspaceError("Invalid scene page")
         page_path = item["FileName"]
@@ -362,10 +377,18 @@ def extract_scene_template(files: dict[str, str], scene_path: str) -> tuple[dict
         paths.add(page_path)
         page = parse_jsonc(files[page_path])
         if isinstance(page, dict) and "CommandFile" in page:
-            paths.add(page["CommandFile"])
+            commandfile = page["CommandFile"]
+            if not isinstance(commandfile, str):
+                raise WorkspaceError(f"Invalid command file in {page_path}")
+            paths.add(commandfile)
     for key in ("StartCommandSequence", "ExitCommandSequence"):
-        for command in scene.get(key, []):
+        actions = scene.get(key, [])
+        if not isinstance(actions, list):
+            raise WorkspaceError(f"{key} must be an array")
+        for command in actions:
             if isinstance(command, dict) and "CommandFile" in command:
+                if not isinstance(command["CommandFile"], str):
+                    raise WorkspaceError(f"Invalid command file in {key}")
                 paths.add(command["CommandFile"])
     for path in paths:
         if path not in files or not is_exportable_json(path):
@@ -393,6 +416,7 @@ def apply_scene_template(files: dict[str, str], scene_entry: dict,
     if not isinstance(index, dict) or not isinstance(index.get("Scenes"), list):
         raise WorkspaceError("Destination Scenes.json is invalid")
     entry_path = scene_entry["FileName"]
+    index_changed = True
     for other in index["Scenes"]:
         if not isinstance(other, dict):
             raise WorkspaceError("Invalid destination scene index")
@@ -400,11 +424,14 @@ def apply_scene_template(files: dict[str, str], scene_entry: dict,
                 other.get("SceneName") == scene_entry.get("SceneName")):
             if other != scene_entry:
                 raise WorkspaceError("Scene index already uses this name or file")
+            index_changed = False
             break
-    else:
+    if index_changed:
         index["Scenes"].append(deepcopy(scene_entry))
     updated = dict(files)
     updated.update(template_files)
-    updated["Scenes.json"] = dump_json(index)
+    if index_changed:
+        # Only reserialize the index when adding a new scene.
+        updated["Scenes.json"] = dump_json(index)
     check_bundle_limits(updated)
     return updated

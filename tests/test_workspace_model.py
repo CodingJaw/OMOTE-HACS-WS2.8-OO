@@ -98,6 +98,32 @@ class TestJsonModel(unittest.TestCase):
     def test_complete_bundle_validates(self):
         self.assertEqual(model.validate_bundle(sample_bundle()), [])
 
+    def test_invalid_widget_structure_reports_error_instead_of_crashing(self):
+        files = sample_bundle()
+        page = model.parse_jsonc(files["Pages/TV.json"])
+        page["Widgets"] = None
+        page["ButtonMaps"] = []
+        files["Pages/TV.json"] = model.dump_json(page)
+        issues = model.validate_bundle(files)
+        self.assertTrue(any("Widgets must be an array" in x["message"] for x in issues))
+        self.assertTrue(any("ButtonMaps must be an object" in x["message"] for x in issues))
+
+    def test_invalid_scene_sequence_is_reported(self):
+        files = sample_bundle()
+        scene = model.parse_jsonc(files["Scenes/TV.json"])
+        scene["StartCommandSequence"] = None
+        files["Scenes/TV.json"] = model.dump_json(scene)
+        issues = model.validate_bundle(files)
+        self.assertTrue(any("StartCommandSequence must be an array" in x["message"] for x in issues))
+
+    def test_applying_same_template_twice_is_idempotent(self):
+        source = sample_bundle()
+        entry, template = model.extract_scene_template(source, "Scenes/TV.json")
+        target = {"Scenes.json": '{"Scenes":[]}'}
+        applied = model.apply_scene_template(target, entry, template)
+        again = model.apply_scene_template(applied, entry, template)
+        self.assertEqual(again, applied)
+
     def test_missing_reference_is_error(self):
         files = sample_bundle()
         files.pop("Pages/TV.json")
