@@ -21,9 +21,9 @@ from .safe_files import is_exportable_json
 from .workspace_ws import register_workspace_websockets
 
 PANEL_PATH = "omote-manager"
-PANEL_ELEMENT = "omote-manager-panel-v9"
+PANEL_ELEMENT = "omote-manager-panel-v10"
 STATIC_PATH = "/omote_manager_static"
-ASSET_VERSION = "0.1.0-dev9"
+ASSET_VERSION = "0.1.0-dev10"
 
 
 async def async_register_manager_panel(hass: HomeAssistant) -> None:

@@ -1,7 +1,7 @@
 {
   "domain": "omote_manager",
   "name": "OMOTE Manager",
-  "version": "0.1.0-dev9",
+  "version": "0.1.0-dev10",
   "documentation": "https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO",
   "issue_tracker": "https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues",
   "codeowners": [

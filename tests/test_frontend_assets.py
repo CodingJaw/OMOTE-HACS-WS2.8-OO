@@ -67,6 +67,15 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("omote_manager/editor/preflight", diff_view)
         self.assertIn("ws_preflight", (ROOT / "editor_ws.py").read_text())
         self.assertIn("apply_live_results", (ROOT / "review_model.py").read_text())
+        self.assertIn("se-kit-download", diff_view)
+        self.assertIn("omote_manager/editor/export-kit", diff_view)
+        self.assertIn("atob(result.base64)", diff_view)
+        self.assertIn("register_release_websockets", (ROOT / "editor_ws.py").read_text())
+        self.assertIn("omote_manager/editor/export-kit", (ROOT / "release_ws.py").read_text())
+        self.assertIn("build_deployment_kit", (ROOT / "release_model.py").read_text())
+        self.assertIn("proposed", (ROOT / "release_model.py").read_text())
+        self.assertIn("rollback", (ROOT / "release_model.py").read_text())
+
 
 
 

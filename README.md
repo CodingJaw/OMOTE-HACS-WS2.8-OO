@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev9 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev10 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -65,13 +65,13 @@ The integration can read the live device settings and schema through its API cli
 
 The current firmware's configuration HTTP interface uses **unauthenticated HTTP** and permissive CORS. Do not expose it to the Internet or untrusted LAN clients. This integration deliberately exposes **no write, delete, or reboot actions** while the firmware lacks authenticated, transactional deployment.
 
-### Important: complete-file import fix (v0.1.0-dev9)
+### Important: complete-file import fix (v0.1.0-dev6)
 
 Earlier versions accidentally treated one `aiohttp` stream read as a complete response. On ESP32 this could import partial JSON and produce many false syntax errors. This release drains the entire response, compares the number of bytes with `/api/fs/stat`, and falls back to verified offset-based chunked reads if needed. Before replacing an existing draft, every imported file is syntactically validated (including OMOTE's JSON comments). A failed import keeps the previous draft unchanged.
 
 If you previously imported a corrupt draft, select the remote and click **Import remote JSON** again, accepting the local-draft replacement prompt. This replaces the HOME ASSISTANT draft only. Then run **Validate draft**. If it still reports errors, check the newly reported details; they may be genuine missing command references or files that differ from the firmware repository.
 
-### Scene / page / button editor and draft comparison (v0.1.0-dev9)
+### Scene / page / button editor and draft comparison (v0.1.0-dev7)
 
 Within **Profile Studio**, scroll past the Command Editor to **Scenes, pages & button assignments**:
 
@@ -85,7 +85,7 @@ All changes use the unmodified OMOTE firmware JSON structures and are saved only
 
 For safety, the editor restricts command bindings to names already present in the corresponding command file, taking each scene's CommandPrefix into account. To select another command, first add it to the corresponding firmware-format command file in a future milestone. After editing, select **Validate draft** to inspect cross-file references. The diff viewer is local only and is not a deploy/restore interface.
 
-### Visual touchscreen page layout (v0.1.0-dev9)
+### Visual touchscreen page layout (v0.1.0-dev8)
 
 The **Visual page layout** section within **Profile Studio → Scenes, pages & button assignments** displays a schematic portrait **240 × 320 px** Waveshare screen and the selected page's widgets. It reads current `HeightPct`, `AlignTo`, `PosX`, `PosY` and `SizeXY` fields from the imported JSON.
 
@@ -102,6 +102,21 @@ In **Profile Studio → Compare original and draft**, updated unified diffs use 
 A new **Deployment readiness review** underneath the comparison lists changed paths, per-file raw-byte SHA-256 hashes and sizes, structural validation counts and any blockers. With **Read changed files from Waveshare** enabled, the Home Assistant backend verifies the firmware API, reads only the draft's changed original files, and compares them to the imported baseline; a new draft file already present on the remote is reported as a conflict. If the device is offline, deselect the live check for a local-only review. This check is point-in-time and does not guarantee the files remain unchanged afterward.
 
 **Deployment remains disabled.** The firmware API does not yet provide authenticated transaction staging, commit verification and reliable rollback. The review never writes configuration files, does not change the device, and does not overwrite drafts. Draft edits invalidate an earlier review.
+
+### Downloadable deployment and recovery kit (v0.1.0-dev10)
+
+**This is an offline file export, not automatic firmware deployment.** The current Waveshare configuration API still has unsafe direct file-write endpoints. No data is uploaded to the remote by this release.
+
+After editing a draft in **Profile Studio → Compare original and draft**:
+
+1. Click **Run review** to validate the files and (optionally) compare changed originals to the live Waveshare.
+2. If the draft has changes, zero validation errors, and no live conflicts, the **Download reviewed ZIP** button becomes available.
+3. Click to download `omote-deployment-review-kit.zip`. With a live review, the integration repeats the remote baseline check immediately before creating the archive. If the remote is offline, uncheck **Read changed files from Waveshare**, run an offline review, and confirm the warning before exporting. Offline exports are **UNVERIFIED**.
+4. Inspect the archive: `proposed/` is the full editable OMOTE JSON subset in the Home Assistant draft; `rollback/` is the original JSON subset imported from the remote; `MANIFEST.json` provides changed file paths, sizes and SHA-256 hashes; `READ_ME_FIRST.txt` contains recovery warnings.
+
+The ZIP **does not include** `HaSettings.json`, `DeviceSettings.json`, other known credential files, images, the complete LittleFS filesystem, or a flashable firmware image. Custom JSON values may contain personal or sensitive command data. Protect the downloaded ZIP accordingly. Restoring this limited baseline cannot substitute for a complete device/firmware backup.
+
+A checked or exported archive does not enable wireless deployment. Newer firmware will need an authenticated, versioned, crash-safe transaction protocol and device-side rollback. See [Deployment protocol proposal](docs/DEPLOYMENT_PROTOCOL.md). The user must explicitly approve any firmware modifications.
 
 ### If the editor is missing after updating
 

@@ -184,3 +184,43 @@
   .se-diff-toolbar { align-items: flex-start; }
   .se-diff-legend span { font-size: 10px; padding: 5px 7px; }
 }
+
+/* Export package is only an offline proposal/rollback reference, not flashing. */
+.se-kit-export {
+  margin-top: 16px;
+  border: 1px solid var(--divider-color, #d7e1ed);
+  border-radius: 9px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: var(--card-background-color, #fff);
+}
+.se-kit-export > div { flex: 1; min-width: 230px; }
+.se-kit-export strong { font-size: 13px; }
+.se-kit-export p {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--secondary-text-color, #667788);
+  margin: 6px 0 0;
+}
+.se-kit-export button {
+  background: var(--primary-color, #1976d2);
+  color: #fff;
+  border-color: var(--primary-color, #1976d2);
+  white-space: nowrap;
+}
+.se-kit-export button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+#se-kit-status {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  color: var(--secondary-text-color, #667788);
+}
+#se-kit-status:empty { display: none; }

@@ -12,6 +12,9 @@ class SceneEditor {
     this.diffData = null;
     this.reviewHash = null;
     this.reviewToken = 0;
+    this.reviewRevision = null;
+    this.reviewCheckedLive = null;
+    this.reviewValid = false;
     this.busy = false;
     this.layoutEditor = null;
     this.create();
@@ -27,7 +30,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev9";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev10";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -91,8 +94,15 @@ class SceneEditor {
       '  <div id="se-review-report" class="se-review-report" role="status" aria-live="polite">',
       '    No review performed yet. Remote files will never be written by this check.',
       '  </div>',
+      '  <div class="se-kit-export">',
+      '    <div><strong>Deployment &amp; rollback package</strong>',
+      '      <p>Download proposed JSON, original imported files and a SHA-256 manifest.',
+      '      This is not an installable firmware image.</p></div>',
+      '    <button type="button" id="se-kit-download" disabled>Download reviewed ZIP</button>',
+      '  </div>',
+      '  <p id="se-kit-status" role="status" aria-live="polite"></p>',
       '</div>',
-      '<small>All comparisons and deployment reviews are read-only. Firmware deployment is disabled.</small></div>'
+      '<small>All comparisons, downloads and reviews are read-only. Remote deployment remains disabled.</small></div>'
     ].join("");
     const validation = this.studio.section.querySelector(".studio-validation");
     validation.parentNode.insertBefore(section, validation);
@@ -134,6 +144,10 @@ class SceneEditor {
     this.ui("se-revert").addEventListener("click", () => void this.revert());
     this.ui("se-only-changes").addEventListener("change", () => this.renderDiff());
     this.ui("se-review-run").addEventListener("click", () => void this.runReview());
+    this.ui("se-kit-download").addEventListener("click", () => void this.downloadKit());
+    this.ui("se-review-check-live").addEventListener("change", () => {
+      this.clearReview("Review preference changed. Run review again before downloading.");
+    });
   }
 
   select(el, items, chosen) {
@@ -163,7 +177,7 @@ class SceneEditor {
 
   async loadLayoutEditor() {
     try {
-      const module = await import("./layout-editor.js?v=0.1.0-dev9");
+      const module = await import("./layout-editor.js?v=0.1.0-dev10");
       this.layoutEditor = module.attachVisualLayoutEditor(this);
       this.layoutEditor.render();
     } catch (error) {
@@ -180,8 +194,13 @@ class SceneEditor {
     this.diffPath = "";
     this.diffData = null;
     this.reviewHash = null;
+    this.reviewRevision = null;
+    this.reviewCheckedLive = null;
+    this.reviewValid = false;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = "Select a remote and run the review.";
+    this.ui("se-kit-download").disabled = true;
+    this.ui("se-kit-status").textContent = "";
     if (this.layoutEditor) this.layoutEditor.onRemoteChanged();
     ++this.token;
     ++this.diffToken;
@@ -483,8 +502,13 @@ class SceneEditor {
 
   clearReview(message) {
     this.reviewHash = null;
+    this.reviewRevision = null;
+    this.reviewCheckedLive = null;
+    this.reviewValid = false;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = message;
+    this.ui("se-kit-download").disabled = true;
+    this.ui("se-kit-status").textContent = "";
   }
 
   async runReview() {
@@ -497,6 +521,11 @@ class SceneEditor {
     const entry = this.entryId;
     const button = this.ui("se-review-run");
     button.disabled = true;
+    this.reviewValid = false;
+    this.reviewHash = null;
+    this.reviewRevision = null;
+    this.ui("se-kit-download").disabled = true;
+    this.ui("se-kit-status").textContent = "";
     reportElement.textContent = "Checking draft validation, file hashes and remote drift…";
     try {
       const answer = await this.studio.hass().callWS({
@@ -506,6 +535,18 @@ class SceneEditor {
       });
       if (token !== this.reviewToken || entry !== this.entryId) return;
       this.reviewHash = answer.draft_sha256;
+      this.reviewRevision = answer.revision;
+      this.reviewCheckedLive = Boolean(this.ui("se-review-check-live").checked);
+      this.reviewValid = (
+        answer.errors === 0 && answer.changed_count > 0 &&
+        (!this.reviewCheckedLive || answer.live_check?.matches === true)
+      );
+      this.ui("se-kit-download").disabled = !this.reviewValid;
+      this.ui("se-kit-status").textContent = this.reviewValid
+        ? (this.reviewCheckedLive
+          ? "Kit can be created with a fresh remote-drift check."
+          : "Offline export: remote baseline will be marked UNVERIFIED.")
+        : "Fix validation errors or remote conflicts before downloading a kit.";
       reportElement.replaceChildren();
       const summary = document.createElement("p");
       summary.className = answer.errors || answer.live_check?.matches === false
@@ -571,6 +612,72 @@ class SceneEditor {
       // An edit can invalidate the request token before this finally block.
       // The initiating button must still be re-enabled.
       button.disabled = false;
+    }
+  }
+
+  async downloadKit() {
+    if (!this.draft || !this.entryId || !this.reviewValid || !this.reviewHash) {
+      this.ui("se-kit-status").textContent =
+        "Run a successful review before requesting the deployment kit.";
+      return;
+    }
+    const isLive = this.ui("se-review-check-live").checked;
+    if (isLive !== this.reviewCheckedLive) {
+      this.clearReview("Review preference changed. Run review again.");
+      return;
+    }
+    if (!isLive && !window.confirm(
+      "Download an OFFLINE, UNVERIFIED deployment-review kit? The archive " +
+      "will not claim that its baseline matches the current Waveshare. " +
+      "It is not a flashable firmware image."
+    )) return;
+    const button = this.ui("se-kit-download");
+    button.disabled = true;
+    const entry = this.entryId;
+    const expectedHash = this.reviewHash;
+    const revision = this.reviewRevision;
+    const status = this.ui("se-kit-status");
+    status.textContent = "Building checked proposal and rollback archive…";
+    try {
+      const result = await this.studio.hass().callWS({
+        type: "omote_manager/editor/export-kit",
+        entry_id: entry,
+        revision,
+        draft_sha256: expectedHash,
+        check_live: isLive
+      });
+      if (entry !== this.entryId || expectedHash !== this.reviewHash) {
+        throw new Error("Remote or draft changed during download; review again.");
+      }
+      if (result.deployment_enabled !== false ||
+          result.draft_sha256 !== expectedHash ||
+          result.mime_type !== "application/zip" ||
+          !result.base64) {
+        throw new Error("Invalid or stale archive response from integration.");
+      }
+      const data = atob(result.base64);
+      if (data.length !== result.bytes || data.length > 2 * 1024 * 1024) {
+        throw new Error("Download failed archive size verification.");
+      }
+      const bytes = new Uint8Array(data.length);
+      for (let i = 0; i < data.length; i++) bytes[i] = data.charCodeAt(i);
+      const zip = new Blob([bytes], {type: "application/zip"});
+      const url = URL.createObjectURL(zip);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.filename || "omote-deployment-review-kit.zip";
+      this.studio.root.append(link);
+      link.click();
+      link.remove();
+      // Allow browser download manager to resolve the temporary blob.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      status.textContent = "Review/rollback ZIP downloaded (" + result.bytes +
+        " bytes, " + result.review_status + "). Remote was not modified.";
+    } catch (error) {
+      status.textContent = "Download failed: " + String(error.message || error) +
+        ". Existing drafts and the remote remain unchanged.";
+    } finally {
+      button.disabled = !this.reviewValid;
     }
   }
 

@@ -397,6 +397,29 @@ class WorkspaceStore:
         }
         return report, originals
 
+    def release_snapshot(
+        self, entry_id: str
+    ) -> tuple[dict[str, Any], dict[str, str], dict[str, str], dict[str, str]]:
+        """Capture one immutable view of proposed, baseline and review revision.
+
+        This copies state before any awaits in the HTTP drift verification.
+        Changed-path originals are included separately for efficient API reads.
+        """
+        state = self._read()
+        draft = state["drafts"].get(entry_id)
+        if draft is None:
+            raise WorkspaceError("Import this remote before downloading a release kit")
+        proposed = draft["files"]
+        baseline = draft["base_files"]
+        report = make_review(proposed, baseline)
+        report["revision"] = state["revision"]
+        originals = {
+            item["path"]: baseline[item["path"]]
+            for item in report["changed_files"]
+            if item["before_sha256"] is not None
+        }
+        return report, proposed, baseline, originals
+
     def diff(self, entry_id: str, path: str | None = None) -> dict[str, Any]:
         """Inspect local draft changes without exposing other configuration."""
         draft = self._state["drafts"].get(entry_id)

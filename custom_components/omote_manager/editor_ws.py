@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .api import OmoteApiError
 from .review_model import apply_live_results
+from .release_ws import register_release_websockets
 from .workspace_model import WorkspaceError
 from .workspace_store import WorkspaceStore
 
@@ -312,3 +313,4 @@ def register_editor_websockets(hass: HomeAssistant) -> None:
         ws_edit_button, ws_edit_layout, ws_diff, ws_preflight, ws_revert,
     ):
         websocket_api.async_register_command(hass, handler)
+    register_release_websockets(hass)
