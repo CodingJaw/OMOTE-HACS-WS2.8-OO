@@ -12,7 +12,9 @@ class OmoteWorkspaceStudio {
     this._commandToken = 0;
     this._busy = false;
     this._ready = false;
+    this.sceneEditor = null;
     this._build();
+    void this._loadSceneEditor();
     void this.refresh();
   }
 
@@ -107,6 +109,17 @@ class OmoteWorkspaceStudio {
     });
   }
 
+  async _loadSceneEditor() {
+    try {
+      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev7");
+      this.sceneEditor = attachSceneEditor(this);
+    } catch (error) {
+      console.error("OMOTE scene/page editor failed to initialize", error);
+      this.message("Scene/page editor unavailable: " +
+        String(error.message || error), true);
+    }
+  }
+
   message(message, error = false) {
     const element = this.ui("studio-notice");
     element.textContent = message || "";
@@ -187,6 +200,7 @@ class OmoteWorkspaceStudio {
   }
 
   onRemoteChanged() {
+    if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
     this.selectedFile = "";
     this.selectedCommand = "";
     this.commands = [];
@@ -208,6 +222,7 @@ class OmoteWorkspaceStudio {
     this.renderLocations();
     this.renderTemplates();
     this.renderCommands();
+    if (this.sceneEditor) this.sceneEditor.render();
   }
 
   renderLocations() {
