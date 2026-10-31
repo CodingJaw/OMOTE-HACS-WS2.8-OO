@@ -28,6 +28,16 @@ from .workspace_model import (
     validate_bundle,
 )
 
+from .editor_model import (
+    scene_detail,
+    edit_scene,
+    edit_page_title,
+    edit_widget,
+    edit_button_map,
+    draft_diff,
+    revert_draft_file,
+)
+
 MAX_LOCATIONS = 100
 MAX_TEMPLATES = 64
 MAX_DRAFTS = 20
@@ -284,3 +294,90 @@ class WorkspaceStore:
             "sha256": file_digest(draft["files"]),
             "deployment_enabled": False,
         }
+
+    def scene_editor(self, entry_id: str, scene_path: str) -> dict[str, Any]:
+        """Return live parsed information from the local draft only."""
+        draft = self._state["drafts"].get(entry_id)
+        if draft is None:
+            raise WorkspaceError("Import a remote before editing its scenes")
+        return scene_detail(draft["files"], scene_path)
+
+    async def async_edit_scene(
+        self, revision: int, entry_id: str, path: str,
+        name: str, screen_name: str, bind_key: str, press_type: str,
+    ) -> None:
+        """Update scene index and scene file within one HA storage revision."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = edit_scene(
+                draft["files"], path, name=name, screen_name=screen_name,
+                bind_key=bind_key, press_type=press_type,
+            )
+        await self._mutate(revision, operation)
+
+    async def async_edit_page_title(
+        self, revision: int, entry_id: str, scene_path: str, page_index: int,
+        name: str, short_name: str,
+    ) -> None:
+        """Edit scene-local page title, not shared page definition."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = edit_page_title(
+                draft["files"], scene_path, page_index,
+                name=name, short_name=short_name,
+            )
+        await self._mutate(revision, operation)
+
+    async def async_edit_widget(
+        self, revision: int, entry_id: str, scene_path: str, page_index: int,
+        widget_index: int, field: str, value: str, command_index: int = 0,
+    ) -> None:
+        """Change a documented widget caption or existing command mapping."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = edit_widget(
+                draft["files"], scene_path, page_index, widget_index,
+                field=field, value=value, command_index=command_index,
+            )
+        await self._mutate(revision, operation)
+
+    async def async_edit_button_map(
+        self, revision: int, entry_id: str, scene_path: str, page_index: int,
+        key: str, event: str, command: str,
+    ) -> None:
+        """Change a documented physical key event mapping in an HA-only draft."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = edit_button_map(
+                draft["files"], scene_path, page_index, key=key,
+                event=event, command=command,
+            )
+        await self._mutate(revision, operation)
+
+    def diff(self, entry_id: str, path: str | None = None) -> dict[str, Any]:
+        """Inspect local draft changes without exposing other configuration."""
+        draft = self._state["drafts"].get(entry_id)
+        if draft is None:
+            raise WorkspaceError("Import a remote before comparing files")
+        return draft_diff(draft["files"], draft["base_files"], path=path)
+
+    async def async_revert_file(
+        self, revision: int, entry_id: str, path: str,
+    ) -> None:
+        """Restore one draft file to its imported original; never touch firmware."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = revert_draft_file(
+                draft["files"], draft["base_files"], path
+            )
+        await self._mutate(revision, operation)

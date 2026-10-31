@@ -24,7 +24,7 @@ class OmoteWorkspaceStudio {
   _build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev6";
+    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev7";
     this.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "studio pane";
@@ -341,6 +341,7 @@ class OmoteWorkspaceStudio {
       this.selectedFile = "";
       this.selectedCommand = "";
       this.commands = [];
+      if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
       this.ui("studio-issues").textContent = "Imported. Run validation to check references.";
       this.render();
     }
@@ -382,7 +383,10 @@ class OmoteWorkspaceStudio {
       type: "omote_manager/workspace/apply-template",
       entry_id: this.selectedEntry(), template_id: templateId
     }, "Template copied into local draft. Validate before any future deployment.");
-    if (success) this.ui("studio-issues").textContent = "Template added to draft. Run validation.";
+    if (success) {
+      if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
+      this.ui("studio-issues").textContent = "Template added to draft. Run validation.";
+    }
   }
 
   async saveCommand(form) {

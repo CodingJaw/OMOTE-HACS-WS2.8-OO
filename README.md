@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev6 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev7 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -65,15 +65,29 @@ The integration can read the live device settings and schema through its API cli
 
 The current firmware's configuration HTTP interface uses **unauthenticated HTTP** and permissive CORS. Do not expose it to the Internet or untrusted LAN clients. This integration deliberately exposes **no write, delete, or reboot actions** while the firmware lacks authenticated, transactional deployment.
 
-### Important: complete-file import fix (v0.1.0-dev6)
+### Important: complete-file import fix (v0.1.0-dev7)
 
 Earlier versions accidentally treated one `aiohttp` stream read as a complete response. On ESP32 this could import partial JSON and produce many false syntax errors. This release drains the entire response, compares the number of bytes with `/api/fs/stat`, and falls back to verified offset-based chunked reads if needed. Before replacing an existing draft, every imported file is syntactically validated (including OMOTE's JSON comments). A failed import keeps the previous draft unchanged.
 
 If you previously imported a corrupt draft, select the remote and click **Import remote JSON** again, accepting the local-draft replacement prompt. This replaces the HOME ASSISTANT draft only. Then run **Validate draft**. If it still reports errors, check the newly reported details; they may be genuine missing command references or files that differ from the firmware repository.
 
+### Scene / page / button editor and draft comparison (v0.1.0-dev7)
+
+Within **Profile Studio**, scroll past the Command Editor to **Scenes, pages & button assignments**:
+
+- Choose a scene from the imported firmware's Scenes.json and edit the scene menu name, screen title and optional physical launch key/press type.
+- Choose a tab/page and edit its scene-local page name and short tab label.
+- Select an existing touchscreen Button, Label, ColorButtons or NumberPad widget. Edit its existing text (if supported) or its command binding, including an individual command-array position.
+- Choose an OMOTE physical key and event (Press, Release, Repeat, Short, Long); map it to an existing command in the page command file or clear the event.
+- Use **Compare original and draft** to view exact changed JSON lines, then optionally revert just that local draft file.
+
+All changes use the unmodified OMOTE firmware JSON structures and are saved only to Home Assistant's private workspace store. Unknown JSON fields are retained. Editing an existing file normalizes that file's formatting/comments. **Page definition files may be shared by multiple scenes**: changes to their widgets or physical ButtonMaps are visible in every scene referencing the page. Page title/short tab label edits only touch the selected scene entry.
+
+For safety, the editor restricts command bindings to names already present in the corresponding command file, taking each scene's CommandPrefix into account. To select another command, first add it to the corresponding firmware-format command file in a future milestone. After editing, select **Validate draft** to inspect cross-file references. The diff viewer is local only and is not a deploy/restore interface.
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev6, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev7, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Planned milestones
 

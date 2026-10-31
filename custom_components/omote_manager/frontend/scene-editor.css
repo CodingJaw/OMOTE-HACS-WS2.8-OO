@@ -1,0 +1,92 @@
+/* Profile Studio scene/page editor – Home Assistant theme-aware layout. */
+.scene-editor {
+  padding: 22px 24px 24px;
+  border-top: 1px solid var(--divider-color, #e4e8ec);
+}
+.scene-editor > header, .se-diff > header {
+  display: flex; align-items: start; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.scene-editor h3 { font-size: 17px; margin: 0 0 7px; }
+.scene-editor h4 { font-size: 13px; margin: 0 0 12px; font-weight: 700; }
+.scene-editor header p { font-size: 12px; margin: 0; }
+.scene-editor header > span { font-size: 11px; }
+.se-pickers { display: flex; gap: 12px; flex-wrap: wrap; }
+.se-pickers label { flex: 1; min-width: 210px; }
+.scene-editor label {
+  display: grid; gap: 6px; font-size: 11px; font-weight: 700;
+}
+.scene-editor input, .scene-editor select {
+  color: var(--primary-text-color, #2d3d4d);
+  background: var(--card-background-color, #fff);
+  border: 1px solid var(--divider-color, #ced8e2);
+  padding: 10px; border-radius: 7px; font: inherit;
+  font-size: 12px; font-weight: 400; width: 100%; min-width: 0;
+}
+.scene-editor input:focus-visible, .scene-editor select:focus-visible {
+  outline: 2px solid var(--primary-color, #1976d2);
+  outline-offset: 1px;
+}
+.scene-editor button {
+  padding: 10px 12px;
+  font-size: 12px; font-weight: 700;
+  border: 1px solid var(--divider-color, #cbd8e4);
+  background: var(--card-background-color, #fff);
+  border-radius: 8px;
+}
+.scene-editor button[type="submit"] {
+  background: var(--primary-color, #1976d2);
+  color: #fff; border-color: var(--primary-color, #1976d2);
+}
+.scene-editor button:disabled { cursor: not-allowed; opacity: .5; }
+.scene-editor #se-path {
+  font-size: 11px; overflow-wrap: anywhere;
+  margin: 11px 0 19px;
+}
+.scene-editor #se-message {
+  font-size: 12px; padding: 0; margin: 0 0 14px; overflow-wrap: anywhere;
+  color: var(--success-color, #178458);
+}
+.scene-editor #se-message:empty { display: none; }
+.scene-editor #se-message.se-error {
+  color: var(--error-color, #b94343);
+}
+.se-grid {
+  display: grid; grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+.se-grid form {
+  display: grid; align-content: start; gap: 11px;
+  background: var(--secondary-background-color, #f8fafc);
+  padding: 18px; border: 1px solid var(--divider-color, #e4eaf0);
+  border-radius: 10px; min-width: 0;
+}
+.se-grid small, .se-diff small {
+  font-size: 11px; color: var(--secondary-text-color, #7b8795);
+  font-weight: 400; line-height: 1.55;
+}
+.se-grid [hidden] { display: none !important; }
+.se-diff {
+  margin-top: 18px; padding: 18px;
+  background: var(--secondary-background-color, #f8fafc);
+  border: 1px solid var(--divider-color, #e2e9f1);
+  border-radius: 10px;
+}
+.se-diff > header { align-items: center; }
+.se-diff h4 { margin-bottom: 0; }
+.se-diff-controls {
+  display: flex; align-items: flex-end; flex-wrap: wrap;
+  gap: 12px; margin-bottom: 12px;
+}
+.se-diff-controls label { flex: 1; min-width: 200px; }
+.se-diff pre {
+  min-height: 155px; max-height: 380px; margin-bottom: 11px;
+  overflow: auto; font-size: 11px; line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre; padding: 14px;
+}
+@media (max-width: 760px) {
+  .scene-editor { padding: 18px 14px; }
+  .se-grid { grid-template-columns: 1fr; }
+  .se-grid form { padding: 15px; }
+}

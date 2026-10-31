@@ -21,6 +21,7 @@ jobs:
         run: |
           node --check custom_components/omote_manager/frontend/omote-panel.js
           node --check --input-type=module < custom_components/omote_manager/frontend/workspace-panel.js
+          node --check --input-type=module < custom_components/omote_manager/frontend/scene-editor.js
       - name: Validate JSON metadata
         run: |
           python - <<'PY'

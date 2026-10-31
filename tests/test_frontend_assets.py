@@ -42,6 +42,11 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertTrue((FRONTEND / "workspace-panel.js").is_file())
         self.assertTrue((FRONTEND / "workspace.css").is_file())
         self.assertIn("attachWorkspace", (FRONTEND / "workspace-panel.js").read_text())
+        scene_module = FRONTEND / "scene-editor.js"
+        self.assertTrue(scene_module.is_file())
+        self.assertIn("attachSceneEditor", scene_module.read_text())
+        self.assertIn("scene-editor.js?v=", (FRONTEND / "workspace-panel.js").read_text())
+        self.assertIn("register_editor_websockets", (ROOT / "workspace_ws.py").read_text())
 
 
 if __name__ == "__main__":

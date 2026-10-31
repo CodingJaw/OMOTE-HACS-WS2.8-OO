@@ -47,3 +47,9 @@ The HA WebSocket workspace endpoints require HA administrator authorization and 
 ## Complete-read transport and atomic draft import (v0.1.0-dev6)
 
 Prior versions used a single `aiohttp.StreamReader.read(65537)`, which can return a partial TCP response before EOF. This caused truncated valid firmware JSON files to appear as syntax errors. Files now use `/api/fs/stat` to verify the expected byte count, consume raw responses to EOF via `iter_chunked`, and use `/api/fs/read/chunk` with explicit byte offsets and header validation as a fallback. JSON syntax and object type are checked before replacing a Home Assistant draft. All file transfers are bounded to 64 KiB per file and 512 KiB total. A firmware-provided content hash or atomic read snapshot is still desirable for detecting same-size in-place changes. The code does not write to the device.
+
+## Scene/page/widget/key editor (v0.1.0-dev7)
+
+Firmware key names and event types were verified against `Platformio/lib/HAL/Hardware/KeyPressAbstract.hpp` in the Waveshare source. Scene index `SceneName`, `BindToKey`, and `PressType` are edited in Scenes.json; `ScreenName` and scene-local `PageName`/`ShortName` are edited in Scenes/scene files. Touchscreen Button/Label captions and existing Button/ColorButtons/NumberPad command entries, along with physical key `ButtonMaps`, are edited in Pages/page files (which can be shared by scenes). Only firmware-supported keys/events and commands that exist in the referenced command file after applying scene CommandPrefix are permitted; the validator must still be run to detect cross-scene effects.
+
+Each mutation is one revision-checked HA Store write. Changed files are exposed as bounded unified diffs against their original imported text, with per-file revert; new template-added files can be removed from the HA draft. No HTTP writes or device firmware operations occur.
