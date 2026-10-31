@@ -1,7 +1,7 @@
 {
   "domain": "omote_manager",
   "name": "OMOTE Manager",
-  "version": "0.1.0-dev2",
+  "version": "0.1.0-dev3",
   "documentation": "https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO",
   "issue_tracker": "https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues",
   "codeowners": [
@@ -9,5 +9,11 @@
   ],
   "config_flow": true,
   "iot_class": "local_polling",
-  "requirements": []
+  "requirements": [],
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ]
 }

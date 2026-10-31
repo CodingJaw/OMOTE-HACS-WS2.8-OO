@@ -17,6 +17,8 @@ jobs:
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
         run: python -m unittest discover -s tests -v
+      - name: Validate sidebar JavaScript
+        run: node --check custom_components/omote_manager/frontend/omote-panel.js
       - name: Validate JSON metadata
         run: |
           python - <<'PY'

@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev2 — read-only; no firmware writes.**
+**Development build 0.1.0-dev3 — read-only; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -16,15 +16,23 @@ A HACS custom integration for [OMOTE object-oriented firmware](https://github.co
 
 These are targets; live installation against the specified versions remains to be tested.
 
-## Installation (development branch)
+## Installation (available on default branch)
 
 1. In HACS, add this repository as a **custom repository** of type **Integration**.
-2. Select the **develop** branch/version if your HACS UI offers it. This is not a published stable release.
+2. Download OMOTE Manager from the default `main` branch (development build; not a stable release).
 3. Install OMOTE Manager and restart Home Assistant.
 4. Go to **Settings → Devices & services → Add integration → OMOTE Manager**.
 5. Enter the Waveshare OMOTE IP or hostname, and API port (80).
 
 Your device must be reachable from Home Assistant's network and must report `"api": "omote-config-v1"` from `/api/status`. Multiple remotes are supported as separate configuration entries.
+
+### Sidebar management panel
+
+After restarting Home Assistant, the **OMOTE Manager** sidebar entry opens an admin-only management panel. It displays each registered remote's connectivity, API version, and the inventory of OMOTE configuration JSON files grouped under Scenes, Pages, Commands, Devices, and Actions. Click a file for a read-only preview. The Backup JSON button saves a credential-excluding snapshot in Home Assistant storage; Refresh queries the remote again.
+
+The panel is implemented using the `panel_custom` and WebSocket APIs available in Home Assistant 2024.9.1. Static resources are served by the integration; no external scripts or cloud services are used.
+
+The sidebar is **read-only** in this development version. It is not yet the command/profile editor or a graphical button/page editor, and it cannot deploy changes to OMOTE.
 
 ### Entities
 
@@ -37,7 +45,7 @@ Your device must be reachable from Home Assistant's network and must report `"ap
 - `omote_manager.refresh`: refresh status and file inventory by integration entry ID.
 - `omote_manager.backup_configuration`: save a snapshot of eligible configuration JSON files to Home Assistant's private `.storage/omote_manager.backups_<entry_id>` store. Retains up to three snapshots; excludes credentials and `DeviceSettings.json`. Each file limited to 64 KiB; snapshot limited to 512 KiB. **This is not a complete firmware backup.**
 
-The integration can read the live device settings and schema through its API client, but a settings editor is not part of this first development build.
+The integration can read the live device settings and schema through its API client; editing settings and commands is planned for a future build.
 
 ## Security
 

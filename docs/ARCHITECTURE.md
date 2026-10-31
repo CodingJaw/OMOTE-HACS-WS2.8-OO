@@ -1,6 +1,6 @@
 # Architecture and firmware compatibility
 
-**Phase 1 (this branch):** HACS-installable Home Assistant integration with manual endpoint setup, status polling, configuration inventory and read-only API transport.
+**Phase 1 (this branch):** HACS-installable integration with manual endpoint setup, status polling, configuration inventory, read-only API transport, and an admin-only sidebar panel using Home Assistant 2024.9.1's `panel_custom` API. The panel uses admin-authenticated Home Assistant WebSocket commands to preview eligible JSON files and initiate private configuration backups; firmware writes remain disabled.
 
 Compatibility baseline: Home Assistant Core 2024.9.1, Frontend 20240906.0, HACS integration 2.0.5 / frontend 20250128065759.
 

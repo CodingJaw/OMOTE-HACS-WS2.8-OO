@@ -18,13 +18,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
 from .api import OmoteApi, OmoteApiError
-from .const import (
-    DOMAIN,
-    SAFE_PREFIXES,
-    SAFE_ROOT_FILES,
-    SENSITIVE_FILES,
-)
+from .const import DOMAIN
 from .coordinator import OmoteCoordinator
+from .panel import async_register_manager_panel
+from .safe_files import is_exportable_json
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,22 +31,10 @@ SERVICE_REFRESH = "refresh"
 ENTRY_SCHEMA = vol.Schema({vol.Required("entry_id"): str})
 
 
-def _safe_backup_file(path: str) -> bool:
-    """Only export JSON user-config files; never back up credentials."""
-    if (
-        not path.endswith(".json")
-        or path.startswith("/")
-        or ".." in path
-        or "\\" in path
-        or path.split("/")[-1] in SENSITIVE_FILES
-    ):
-        return False
-    return path in SAFE_ROOT_FILES or path.startswith(SAFE_PREFIXES)
-
-
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration and read-only management actions."""
     hass.data.setdefault(DOMAIN, {})
+    await async_register_manager_panel(hass)
 
     def _coordinator(call: ServiceCall) -> OmoteCoordinator:
         entry_id = call.data["entry_id"]
@@ -77,7 +62,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             saved = {}
             total = 0
             for path in available:
-                if not _safe_backup_file(path):
+                if not is_exportable_json(path):
                     continue
                 content = await api.read_file(path)
                 total += len(content.encode("utf-8"))
