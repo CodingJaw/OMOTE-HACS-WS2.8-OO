@@ -568,7 +568,9 @@ class SceneEditor {
         "Review failed: " + String(error.message || error) +
         ". The remote and stored draft were not modified.";
     } finally {
-      if (token === this.reviewToken) button.disabled = false;
+      // An edit can invalidate the request token before this finally block.
+      // The initiating button must still be re-enabled.
+      button.disabled = false;
     }
   }
 
