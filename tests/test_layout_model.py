@@ -122,6 +122,15 @@ class TestLayoutModel(unittest.TestCase):
         widget = base.parse_jsonc(changed["Pages/TV.json"])["Widgets"][1]
         self.assertEqual(widget["SizeXY"], [75, 0])
 
+    def test_firmware_sub_10_percent_height_is_preserved(self):
+        # JsonPage.cpp raises this to 10% at runtime; config accepts 8%.
+        changed = editor.edit_widget_layout(
+            sample(), "Scenes/TV.json", 0, 1,
+            settings(width_pct=None, height_pct=8)
+        )
+        widget = base.parse_jsonc(changed["Pages/TV.json"])["Widgets"][1]
+        self.assertEqual(widget["HeightPct"], 8)
+
     def test_height_only_uses_heightpct(self):
         changed = editor.edit_widget_layout(
             sample(), "Scenes/TV.json", 0, 1,

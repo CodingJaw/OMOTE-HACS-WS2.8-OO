@@ -102,7 +102,7 @@ def update_widget_layout(
     else:
         _optional_percentage(settings.get("width_pct"), "Width", minimum=1)
         # Firmware clamps positive heights below 10% to 10%.
-        _optional_percentage(settings.get("height_pct"), "Height", minimum=10)
+        _optional_percentage(settings.get("height_pct"), "Height", minimum=1)
 
     changed = deepcopy(widget)
     for key in ("AlignTo", "PosX", "PosY"):

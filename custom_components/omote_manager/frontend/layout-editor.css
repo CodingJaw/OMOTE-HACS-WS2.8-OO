@@ -70,6 +70,10 @@
   white-space: normal; touch-action: none;
   user-select: none; -webkit-user-select: none;
 }
+.scene-editor .lp-widget {
+  padding: 3px; font-size: 10px; font-weight: 600;
+  color: #fff; border: 1px solid #58718b;
+}
 .lp-widget small { font-size: 8px; opacity: .8; }
 .lp-widget.selected {
   border: 2px solid #82c9ff;

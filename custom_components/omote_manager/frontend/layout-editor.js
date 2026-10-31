@@ -261,7 +261,9 @@ class VisualLayoutEditor {
       item.append(primary, secondary);
       item.title = "Widget #" + (widget.index + 1) + " · " +
         (layout?.supported ? "click to inspect; drag if supported" : "read-only");
-      item.addEventListener("click", () => this.choose(widget.index));
+      if (layout?.supported) {
+        item.addEventListener("click", () => this.choose(widget.index));
+      }
       if (layout?.supported && layout.can_position) {
         item.addEventListener("pointerdown", e => this.startDrag(e, item, widget.index));
         item.addEventListener("pointermove", e => this.moveDrag(e, item));
