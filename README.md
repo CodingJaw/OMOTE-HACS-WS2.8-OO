@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev8 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev9 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -65,13 +65,13 @@ The integration can read the live device settings and schema through its API cli
 
 The current firmware's configuration HTTP interface uses **unauthenticated HTTP** and permissive CORS. Do not expose it to the Internet or untrusted LAN clients. This integration deliberately exposes **no write, delete, or reboot actions** while the firmware lacks authenticated, transactional deployment.
 
-### Important: complete-file import fix (v0.1.0-dev8)
+### Important: complete-file import fix (v0.1.0-dev9)
 
 Earlier versions accidentally treated one `aiohttp` stream read as a complete response. On ESP32 this could import partial JSON and produce many false syntax errors. This release drains the entire response, compares the number of bytes with `/api/fs/stat`, and falls back to verified offset-based chunked reads if needed. Before replacing an existing draft, every imported file is syntactically validated (including OMOTE's JSON comments). A failed import keeps the previous draft unchanged.
 
 If you previously imported a corrupt draft, select the remote and click **Import remote JSON** again, accepting the local-draft replacement prompt. This replaces the HOME ASSISTANT draft only. Then run **Validate draft**. If it still reports errors, check the newly reported details; they may be genuine missing command references or files that differ from the firmware repository.
 
-### Scene / page / button editor and draft comparison (v0.1.0-dev8)
+### Scene / page / button editor and draft comparison (v0.1.0-dev9)
 
 Within **Profile Studio**, scroll past the Command Editor to **Scenes, pages & button assignments**:
 
@@ -85,7 +85,7 @@ All changes use the unmodified OMOTE firmware JSON structures and are saved only
 
 For safety, the editor restricts command bindings to names already present in the corresponding command file, taking each scene's CommandPrefix into account. To select another command, first add it to the corresponding firmware-format command file in a future milestone. After editing, select **Validate draft** to inspect cross-file references. The diff viewer is local only and is not a deploy/restore interface.
 
-### Visual touchscreen page layout (v0.1.0-dev8)
+### Visual touchscreen page layout (v0.1.0-dev9)
 
 The **Visual page layout** section within **Profile Studio → Scenes, pages & button assignments** displays a schematic portrait **240 × 320 px** Waveshare screen and the selected page's widgets. It reads current `HeightPct`, `AlignTo`, `PosX`, `PosY` and `SizeXY` fields from the imported JSON.
 
@@ -95,9 +95,17 @@ Select a widget in the dropdown or click its preview box. The inspector can plac
 
 Deployment remains disabled. No image assets are uploaded, no device commands are sent, and no firmware files are modified.
 
+### Color-coded JSON comparison and deployment-readiness review (v0.1.0-dev9)
+
+In **Profile Studio → Compare original and draft**, updated unified diffs use **green for added lines**, **red for removed lines** and **blue for change-section headers**. A legend explains the colors, a summary counts added/removed lines, and **Hide unchanged lines** removes the unmodified context from view. Files are rendered using browser text nodes, not HTML, so JSON content cannot inject markup into the panel.
+
+A new **Deployment readiness review** underneath the comparison lists changed paths, per-file raw-byte SHA-256 hashes and sizes, structural validation counts and any blockers. With **Read changed files from Waveshare** enabled, the Home Assistant backend verifies the firmware API, reads only the draft's changed original files, and compares them to the imported baseline; a new draft file already present on the remote is reported as a conflict. If the device is offline, deselect the live check for a local-only review. This check is point-in-time and does not guarantee the files remain unchanged afterward.
+
+**Deployment remains disabled.** The firmware API does not yet provide authenticated transaction staging, commit verification and reliable rollback. The review never writes configuration files, does not change the device, and does not overwrite drafts. Draft edits invalidate an earlier review.
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev8, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev9, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Planned milestones
 

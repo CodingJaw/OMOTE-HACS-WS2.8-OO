@@ -28,6 +28,8 @@ from .workspace_model import (
     validate_bundle,
 )
 
+from .review_model import make_review
+
 from .editor_model import (
     scene_detail,
     edit_scene,
@@ -376,6 +378,24 @@ class WorkspaceStore:
                 event=event, command=command,
             )
         await self._mutate(revision, operation)
+
+    def review_snapshot(self, entry_id: str) -> tuple[dict[str, Any], dict[str, str]]:
+        """Build read-only plan and capture source files needed for drift check.
+
+        Only changed draft paths that existed at import need their source
+        content checked. No configuration bytes are returned over WebSocket.
+        """
+        draft = self._state["drafts"].get(entry_id)
+        if draft is None:
+            raise WorkspaceError("Import a remote before reviewing a deployment")
+        report = make_review(draft["files"], draft["base_files"])
+        report["revision"] = self._state["revision"]
+        originals = {
+            item["path"]: draft["base_files"][item["path"]]
+            for item in report["changed_files"]
+            if item["before_sha256"] is not None
+        }
+        return report, originals
 
     def diff(self, entry_id: str, path: str | None = None) -> dict[str, Any]:
         """Inspect local draft changes without exposing other configuration."""

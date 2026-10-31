@@ -54,6 +54,20 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertTrue((FRONTEND / "layout-editor.css").is_file())
         self.assertIn("omote_manager/editor/edit-layout", (ROOT / "editor_ws.py").read_text())
         self.assertIn("layout_description", (ROOT / "editor_model.py").read_text())
+        # Colored changes must not be rendered as untrusted HTML.
+        diff_view = scene_module.read_text()
+        for class_name in (
+            "se-diff-add", "se-diff-remove", "se-diff-hunk",
+            "se-diff-context", "se-diff-file-header",
+        ):
+            self.assertIn(class_name, diff_view)
+            self.assertIn(class_name, (FRONTEND / "scene-editor.css").read_text())
+        self.assertIn("node.textContent = line", diff_view)
+        self.assertIn("se-only-changes", diff_view)
+        self.assertIn("omote_manager/editor/preflight", diff_view)
+        self.assertIn("ws_preflight", (ROOT / "editor_ws.py").read_text())
+        self.assertIn("apply_live_results", (ROOT / "review_model.py").read_text())
+
 
 
 if __name__ == "__main__":

@@ -9,6 +9,9 @@ class SceneEditor {
     this.diffPath = "";
     this.token = 0;
     this.diffToken = 0;
+    this.diffData = null;
+    this.reviewHash = null;
+    this.reviewToken = 0;
     this.busy = false;
     this.layoutEditor = null;
     this.create();
@@ -24,7 +27,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev8";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev9";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -68,8 +71,28 @@ class SceneEditor {
       '<button type="button" id="se-refresh-diff">Refresh comparison</button></header>',
       '<div class="se-diff-controls"><label>Modified file<select id="se-diff-file"></select></label>',
       '<button id="se-revert" type="button" disabled>Revert draft file</button></div>',
+      '<div class="se-diff-toolbar">',
+      '  <div class="se-diff-legend" aria-label="Change colors">',
+      '    <span class="se-legend-add">+ Added (green)</span>',
+      '    <span class="se-legend-remove">− Removed (red)</span>',
+      '    <span class="se-legend-hunk">@@ Section (blue)</span>',
+      '  </div>',
+      '  <label class="se-diff-filter"><input id="se-only-changes" type="checkbox">',
+      '    Hide unchanged lines</label>',
+      '</div>',
+      '<p id="se-diff-counts" class="se-diff-counts" aria-live="polite"></p>',
       '<pre id="se-diff" tabindex="0">No modifications since import.</pre>',
-      '<small>No deployment functionality is available in this build.</small></div>'
+      '<div class="se-review">',
+      '  <div class="se-review-heading"><div><h4>6. Deployment readiness review</h4>',
+      '    <p class="muted">Compare changed draft files against the original import and the live remote.</p></div>',
+      '    <button type="button" id="se-review-run">Run review</button></div>',
+      '  <label class="se-review-live"><input type="checkbox" id="se-review-check-live" checked>',
+      '    Read changed files from Waveshare to check for conflicts</label>',
+      '  <div id="se-review-report" class="se-review-report" role="status" aria-live="polite">',
+      '    No review performed yet. Remote files will never be written by this check.',
+      '  </div>',
+      '</div>',
+      '<small>All comparisons and deployment reviews are read-only. Firmware deployment is disabled.</small></div>'
     ].join("");
     const validation = this.studio.section.querySelector(".studio-validation");
     validation.parentNode.insertBefore(section, validation);
@@ -109,6 +132,8 @@ class SceneEditor {
       void this.loadDiff();
     });
     this.ui("se-revert").addEventListener("click", () => void this.revert());
+    this.ui("se-only-changes").addEventListener("change", () => this.renderDiff());
+    this.ui("se-review-run").addEventListener("click", () => void this.runReview());
   }
 
   select(el, items, chosen) {
@@ -138,7 +163,7 @@ class SceneEditor {
 
   async loadLayoutEditor() {
     try {
-      const module = await import("./layout-editor.js?v=0.1.0-dev8");
+      const module = await import("./layout-editor.js?v=0.1.0-dev9");
       this.layoutEditor = module.attachVisualLayoutEditor(this);
       this.layoutEditor.render();
     } catch (error) {
@@ -153,6 +178,10 @@ class SceneEditor {
     this.widgetIndex = 0;
     this.detail = null;
     this.diffPath = "";
+    this.diffData = null;
+    this.reviewHash = null;
+    ++this.reviewToken;
+    this.ui("se-review-report").textContent = "Select a remote and run the review.";
     if (this.layoutEditor) this.layoutEditor.onRemoteChanged();
     ++this.token;
     ++this.diffToken;
@@ -161,6 +190,10 @@ class SceneEditor {
 
   render() {
     const scenes = this.draft?.scenes || [];
+    const currentHash = this.draft?.current_sha256 || null;
+    if (this.reviewHash && this.reviewHash !== currentHash) {
+      this.clearReview("Draft changed since the last review. Run it again.");
+    }
     if (!scenes.some(scene => scene.path === this.scenePath)) {
       this.scenePath = scenes[0]?.path || "";
       this.pageIndex = 0;
@@ -304,6 +337,7 @@ class SceneEditor {
     }, messageOnSuccess);
     this.busy = false;
     if (good) {
+      this.clearReview("Draft changed. Run deployment review again.");
       await this.loadScene();
       await this.refreshDiff();
       this.studio.ui("studio-issues").textContent =
@@ -359,6 +393,8 @@ class SceneEditor {
     const token = ++this.diffToken;
     const entry = this.entryId;
     if (!entry || !this.draft) {
+      this.diffData = null;
+      this.ui("se-diff-counts").textContent = "";
       this.select(this.ui("se-diff-file"), [], "");
       this.ui("se-diff").textContent = "Import a remote configuration first.";
       this.ui("se-revert").disabled = true;
@@ -375,7 +411,11 @@ class SceneEditor {
         changed.map(path => [path,path]), this.diffPath);
       this.ui("se-revert").disabled = !changed.length;
       if (this.diffPath) void this.loadDiff();
-      else this.ui("se-diff").textContent = "No changes since import.";
+      else {
+        this.diffData = null;
+        this.ui("se-diff-counts").textContent = "0 added · 0 removed";
+        this.ui("se-diff").textContent = "No changes since import.";
+      }
     } catch (error) {
       if (token === this.diffToken) this.ui("se-diff").textContent =
         "Comparison failed: " + String(error.message || error);
@@ -393,11 +433,142 @@ class SceneEditor {
         type: "omote_manager/editor/diff", entry_id: entry, path
       });
       if (token !== this.diffToken || entry !== this.entryId || path !== this.diffPath) return;
-      this.ui("se-diff").textContent = result.diff +
-        (result.truncated ? "\n… Diff truncated at 30,000 characters." : "");
+      this.diffData = result;
+      this.renderDiff();
     } catch (error) {
       if (token === this.diffToken) this.ui("se-diff").textContent =
         "Comparison failed: " + String(error.message || error);
+    }
+  }
+
+  renderDiff() {
+    const preview = this.ui("se-diff");
+    const data = this.diffData;
+    if (!data) return;
+    preview.replaceChildren();
+    const onlyChanges = this.ui("se-only-changes").checked;
+    let added = 0;
+    let removed = 0;
+    // Preserve exact diff contents via textContent; do not parse JSON as HTML.
+    for (const line of (data.diff || "").split("\n")) {
+      if (!line && !data.truncated) continue;
+      const header = line.startsWith("--- ") || line.startsWith("+++ ");
+      const hunk = line.startsWith("@@");
+      const isAdd = !header && line.startsWith("+");
+      const isRemove = !header && line.startsWith("-");
+      const context = !header && !hunk && !isAdd && !isRemove;
+      if (isAdd) added++;
+      if (isRemove) removed++;
+      if (onlyChanges && context) continue;
+      const node = document.createElement("span");
+      node.className = "se-diff-line " + (
+        header ? "se-diff-file-header" :
+        hunk ? "se-diff-hunk" :
+        isAdd ? "se-diff-add" :
+        isRemove ? "se-diff-remove" : "se-diff-context"
+      );
+      node.textContent = line || " ";
+      preview.append(node);
+    }
+    if (data.truncated) {
+      const notice = document.createElement("span");
+      notice.className = "se-diff-line se-diff-truncated";
+      notice.textContent = "… Diff truncated at 30,000 characters.";
+      preview.append(notice);
+    }
+    this.ui("se-diff-counts").textContent =
+      added + " added · " + removed + " removed" +
+      (data.truncated ? " · counts refer to visible diff only" : "");
+  }
+
+  clearReview(message) {
+    this.reviewHash = null;
+    ++this.reviewToken;
+    this.ui("se-review-report").textContent = message;
+  }
+
+  async runReview() {
+    if (!this.draft || !this.entryId) {
+      this.clearReview("Import a remote before reviewing its draft.");
+      return;
+    }
+    const reportElement = this.ui("se-review-report");
+    const token = ++this.reviewToken;
+    const entry = this.entryId;
+    const button = this.ui("se-review-run");
+    button.disabled = true;
+    reportElement.textContent = "Checking draft validation, file hashes and remote drift…";
+    try {
+      const answer = await this.studio.hass().callWS({
+        type: "omote_manager/editor/preflight",
+        entry_id: entry,
+        check_live: this.ui("se-review-check-live").checked
+      });
+      if (token !== this.reviewToken || entry !== this.entryId) return;
+      this.reviewHash = answer.draft_sha256;
+      reportElement.replaceChildren();
+      const summary = document.createElement("p");
+      summary.className = answer.errors || answer.live_check?.matches === false
+        ? "se-review-danger" : "se-review-ok";
+      summary.textContent = answer.changed_count + " changed files · " +
+        answer.errors + " validation errors · " + answer.warnings + " warnings";
+      reportElement.append(summary);
+      const hash = document.createElement("p");
+      hash.className = "se-review-hash";
+      hash.textContent = "Draft SHA-256 " + answer.draft_sha256 +
+        " · baseline SHA-256 " + answer.baseline_sha256;
+      reportElement.append(hash);
+      const live = document.createElement("p");
+      const status = answer.live_check || {};
+      live.textContent = status.checked
+        ? status.matches
+          ? "Remote drift: no conflicts in changed files (" +
+            status.checked_files + " original files checked)."
+          : "Remote drift: " + status.conflicts.length + " conflict(s) found."
+        : "Remote drift check not performed (offline/local review).";
+      live.className = status.checked
+        ? status.matches ? "se-review-ok" : "se-review-danger"
+        : "se-review-warning";
+      reportElement.append(live);
+      const files = document.createElement("div");
+      files.className = "se-review-files";
+      for (const item of answer.changed_files || []) {
+        const row = document.createElement("div");
+        row.className = "se-review-file";
+        const title = document.createElement("strong");
+        title.textContent = item.operation.toUpperCase() + " · " + item.path;
+        const meta = document.createElement("small");
+        meta.textContent = item.before_bytes + " → " + item.after_bytes +
+          " bytes · SHA-256 " +
+          (item.after_sha256 ? item.after_sha256.slice(0, 16) + "…" : "deleted");
+        row.append(title, meta);
+        files.append(row);
+      }
+      reportElement.append(files);
+      for (const conflict of status.conflicts || []) {
+        const note = document.createElement("p");
+        note.className = "se-review-danger";
+        note.textContent = "CONFLICT · " + conflict.path + ": " + conflict.reason;
+        reportElement.append(note);
+      }
+      const blockers = document.createElement("div");
+      blockers.className = "se-review-blockers";
+      const heading = document.createElement("strong");
+      heading.textContent = "Deployment remains unavailable";
+      blockers.append(heading);
+      for (const blocker of answer.blockers || []) {
+        const item = document.createElement("p");
+        item.textContent = blocker;
+        blockers.append(item);
+      }
+      reportElement.append(blockers);
+    } catch (error) {
+      if (token !== this.reviewToken) return;
+      reportElement.textContent =
+        "Review failed: " + String(error.message || error) +
+        ". The remote and stored draft were not modified.";
+    } finally {
+      if (token === this.reviewToken) button.disabled = false;
     }
   }
 

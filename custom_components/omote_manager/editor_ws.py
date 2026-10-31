@@ -12,6 +12,8 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .api import OmoteApiError
+from .review_model import apply_live_results
 from .workspace_model import WorkspaceError
 from .workspace_store import WorkspaceStore
 
@@ -229,6 +231,60 @@ async def ws_diff(hass: HomeAssistant, connection, msg: dict) -> None:
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "omote_manager/editor/preflight",
+        vol.Required("entry_id"): str,
+        vol.Optional("check_live", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_preflight(hass: HomeAssistant, connection, msg: dict) -> None:
+    """Review draft validation, proposed file hashes and optional live drift.
+
+    No write method is called here, including when the live check is enabled.
+    The current firmware still lacks safe transactional deployment.
+    """
+    if not _admin(connection, msg):
+        return
+    store = _workspace(hass)
+    try:
+        report, originals = store.review_snapshot(msg["entry_id"])
+    except WorkspaceError as exc:
+        _bad(connection, msg, exc)
+        return
+    if msg["check_live"]:
+        coordinator = hass.data.get(DOMAIN, {}).get(msg["entry_id"])
+        if coordinator is None:
+            connection.send_error(
+                msg["id"], websocket_api.ERR_NOT_FOUND,
+                "Remote unavailable; uncheck live drift to review locally",
+            )
+            return
+        try:
+            # A status read establishes that the expected OMOTE API is present.
+            await coordinator.api.status()
+            inventory = set(await coordinator.api.files())
+            changed = report["changed_files"]
+            live = {}
+            for item in changed:
+                path = item["path"]
+                if path in originals and path in inventory:
+                    live[path] = await coordinator.api.read_file(
+                        path, verify_json=True
+                    )
+        except OmoteApiError:
+            connection.send_error(
+                msg["id"], websocket_api.ERR_UNKNOWN_ERROR,
+                "Unable to verify the remote; try again or review offline",
+            )
+            return
+        # Capture a fresh revision to invalidate a review superseded by edits.
+        stale = store.summary()["revision"] != report["revision"]
+        report = apply_live_results(report, inventory, live, stale=stale)
+    connection.send_result(msg["id"], report)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "omote_manager/editor/revert",
         vol.Required("revision"): _POSITIVE_INT,
         vol.Required("entry_id"): str,
@@ -253,6 +309,6 @@ def register_editor_websockets(hass: HomeAssistant) -> None:
     """Register all editor commands using HA Core 2024.9 WebSocket APIs."""
     for handler in (
         ws_scene, ws_edit_scene, ws_edit_page, ws_edit_widget,
-        ws_edit_button, ws_edit_layout, ws_diff, ws_revert,
+        ws_edit_button, ws_edit_layout, ws_diff, ws_preflight, ws_revert,
     ):
         websocket_api.async_register_command(hass, handler)
