@@ -113,3 +113,44 @@ pre {
 .notice.error { color: var(--error-color, #b72f2f); border-color: var(--error-color, #b72f2f); }
 @media (max-width: 1000px) { .workspace { grid-template-columns: 210px minmax(0,1fr); } .content-grid { grid-template-columns: 1fr; } .file-pane { border-right: 0; border-bottom: 1px solid var(--divider-color, #e9edf0); } #file-list { grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); } }
 @media (max-width: 720px) { .shell { padding: 17px 12px 30px; } .masthead { align-items: flex-start; } h1 { font-size: 24px; } .workspace { grid-template-columns: 1fr; } .summary { gap: 7px; } .stat { padding: 12px; } .stat strong { font-size: 22px; } .stat-label { font-size: 9px; } .editor-head { padding: 18px 12px; } .categories { padding: 0 8px; } .category { padding-left: 8px; padding-right: 8px; } .pill { font-size: 9px; } }
+
+/* Profile Studio navigation, with visible loading and failure states. */
+.panel-nav {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 0 0 15px;
+  border-bottom: 1px solid var(--divider-color, #e5e9ef);
+}
+.panel-nav .nav-pill {
+  border: 1px solid var(--divider-color, #cfd8e0);
+  border-radius: 8px; padding: 11px 16px;
+  background: var(--card-background-color, #fff);
+  font-weight: 700; font-size: 13px;
+}
+.panel-nav .nav-pill.active {
+  border-color: var(--primary-color, #1976d2);
+  color: var(--primary-color, #1976d2);
+  background: var(--secondary-background-color, #e9f2fc);
+}
+.panel-nav > .muted { font-size: 11px; margin-left: auto; }
+.studio-pending {
+  padding: 24px;
+  margin-top: 18px;
+  min-height: 130px;
+  scroll-margin-top: 16px;
+}
+.studio-pending h2 { margin-bottom: 12px; }
+.studio-pending p { line-height: 1.6; }
+.studio-load-error {
+  border-color: var(--error-color, #c43f40);
+}
+.studio-load-error #studio-loading-message {
+  color: var(--error-color, #c43f40);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.workspace, .studio { scroll-margin-top: 16px; }
+@media (max-width: 720px) {
+  .panel-nav { gap: 6px; }
+  .panel-nav > .muted { width: 100%; margin-left: 0; }
+  .panel-nav .nav-pill { padding: 9px 12px; }
+}

@@ -15,6 +15,7 @@ class OmoteManagerPanel extends HTMLElement {
     this._loading = false;
     this._fileRequest = 0;
     this.workspace = null;
+    // Versioned panel name prevents HA from retaining older custom elements.
   }
 
   set hass(hass) {
@@ -33,13 +34,18 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev4">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev5">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
       '    <p class="subtitle">Central configuration workspace for your OMOTE remotes</p></div>' +
       '    <span class="pill">PROFILE STUDIO</span>' +
       '  </header>' +
+      '  <nav class="panel-nav" aria-label="OMOTE Manager sections">' +
+      '    <button type="button" id="nav-overview" class="nav-pill active">Overview</button>' +
+      '    <button type="button" id="nav-studio" class="nav-pill">Profile Studio</button>' +
+      '    <span class="muted">Local drafts only · no firmware writes</span>' +
+      '  </nav>' +
       '  <div id="notice" role="status" aria-live="polite"></div>' +
       '  <section class="summary" id="summary"></section>' +
       '  <div class="workspace">' +
@@ -65,6 +71,11 @@ class OmoteManagerPanel extends HTMLElement {
       '      Live JSON previews are read-only; Profile Studio saves editable drafts in Home Assistant. Deployment remains disabled.</div>' +
       '    </main>' +
       '  </div>' +
+      '  <section id="studio-load-state" class="pane studio-pending" role="status">' +
+      '    <h2>Profile Studio</h2>' +
+      '    <p id="studio-loading-message">Loading Profile Studio…</p>' +
+      '    <p class="muted">This section manages local draft configurations and does not write to the remote.</p>' +
+      '  </section>' +
       '</div>';
     this.shadowRoot.getElementById("refresh").addEventListener("click", () => {
       void this.loadOverview(true);
@@ -72,14 +83,54 @@ class OmoteManagerPanel extends HTMLElement {
     this.shadowRoot.getElementById("backup").addEventListener("click", () => {
       void this.backupSelected();
     });
-    void import("./workspace-panel.js?v=0.1.0-dev4").then(({ attachWorkspace }) => {
-      if (this._mounted) this.workspace = attachWorkspace(this);
-    }).catch((error) => {
-      this._notice("Profile Studio could not load: " + String(error), true);
+    this.shadowRoot.getElementById("nav-overview").addEventListener("click", () => {
+      this._navigateTo("overview");
     });
+    this.shadowRoot.getElementById("nav-studio").addEventListener("click", () => {
+      this._navigateTo("studio");
+    });
+    this._loadStudio();
     if (this._hass && !this._started) {
       this._started = true;
       void this.loadOverview(false);
+    }
+  }
+
+  _navigateTo(section) {
+    const overviewButton = this.shadowRoot.getElementById("nav-overview");
+    const studioButton = this.shadowRoot.getElementById("nav-studio");
+    overviewButton.classList.toggle("active", section === "overview");
+    studioButton.classList.toggle("active", section === "studio");
+    const target = section === "studio"
+      ? this.shadowRoot.querySelector(".studio") ||
+        this.shadowRoot.getElementById("studio-load-state")
+      : this.shadowRoot.querySelector(".workspace");
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  async _loadStudio() {
+    const state = this.shadowRoot.getElementById("studio-load-state");
+    try {
+      const module = await import("./workspace-panel.js?v=0.1.0-dev5");
+      if (!this._mounted) return;
+      if (typeof module.attachWorkspace !== "function") {
+        throw new Error("Profile Studio module has no initializer");
+      }
+      this.workspace = module.attachWorkspace(this);
+      if (state) state.remove();
+    } catch (error) {
+      console.error("OMOTE Profile Studio initialization failed", error);
+      if (state) {
+        state.classList.add("studio-load-error");
+        const details = state.querySelector("#studio-loading-message");
+        if (details) {
+          details.textContent = "Could not initialize Profile Studio: " +
+            String(error && error.message || error);
+        }
+      }
+      this._notice("Profile Studio failed to initialize. See the panel error below.", true);
     }
   }
 
@@ -301,6 +352,8 @@ class OmoteManagerPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("omote-manager-panel")) {
-  customElements.define("omote-manager-panel", OmoteManagerPanel);
+// Use a new element tag for each incompatible UI revision. Earlier frontend
+// sessions can retain old custom-element constructors until a browser reload.
+if (!customElements.get("omote-manager-panel-v5")) {
+  customElements.define("omote-manager-panel-v5", OmoteManagerPanel);
 }

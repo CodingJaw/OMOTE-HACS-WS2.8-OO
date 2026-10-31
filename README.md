@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev4 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev5 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -28,7 +28,7 @@ Your device must be reachable from Home Assistant's network and must report `"ap
 
 ### Sidebar management panel
 
-After restarting Home Assistant, the **OMOTE Manager** sidebar entry opens an admin-only management panel. It displays each registered remote's connectivity, API version, and the inventory of OMOTE configuration JSON files grouped under Scenes, Pages, Commands, Devices, and Actions. Click a file for a read-only preview. The Backup JSON button saves a credential-excluding snapshot in Home Assistant storage; Refresh queries the remote again.
+After restarting Home Assistant, the **OMOTE Manager** sidebar entry opens an admin-only management panel. Use the **Profile Studio** navigation button near the top of the panel to jump to its configuration workspace; the panel displays an explicit loading or error message if the editor cannot initialize. It displays each registered remote's connectivity, API version, and the inventory of OMOTE configuration JSON files grouped under Scenes, Pages, Commands, Devices, and Actions. Click a file for a read-only preview. The Backup JSON button saves a credential-excluding snapshot in Home Assistant storage; Refresh queries the remote again.
 
 The panel is implemented using the `panel_custom` and WebSocket APIs available in Home Assistant 2024.9.1. Static resources are served by the integration; no external scripts or cloud services are used.
 
@@ -64,6 +64,10 @@ The integration can read the live device settings and schema through its API cli
 ## Security
 
 The current firmware's configuration HTTP interface uses **unauthenticated HTTP** and permissive CORS. Do not expose it to the Internet or untrusted LAN clients. This integration deliberately exposes **no write, delete, or reboot actions** while the firmware lacks authenticated, transactional deployment.
+
+### If the editor is missing after updating
+
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev5, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Planned milestones
 
