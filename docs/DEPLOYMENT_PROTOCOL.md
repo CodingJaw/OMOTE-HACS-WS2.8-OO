@@ -1,5 +1,7 @@
 # OMOTE safe deployment protocol — proposed firmware change
 
+**Firmware tracking issue:** [CodingJaw/OMOTE-Firmware-WS2.8-OO #1](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
+
 **Status:** Design proposal only; implementation requires firmware approval and
 hardware testing. Nothing in this document authorizes writes to running devices.
 

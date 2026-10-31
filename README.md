@@ -120,16 +120,16 @@ A checked or exported archive does not enable wireless deployment. Newer firmwar
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev9, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev10, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
-## Planned milestones
+## Development roadmap
 
-1. Read-only monitoring and backups (this development build).
-2. Shared profiles, named locations, command editing and draft validation.
-3. Firmware-authenticated, atomic stage/commit/rollback; only then enable explicit deploy.
-4. Graphical remote layout editor and optional OTA support.
+- Completed in HACS: device monitoring, backups, shared profiles, command editing, JSON validation, scene/page/button editing, schematic layout preview, colored diffs, remote drift review, and download-only deployment/rollback kit.
+- Firmware proposal (requires explicit user approval): [Authenticated transactional configuration API and rollback](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
+- After firmware approval and hardware validation: gated, user-confirmed HACS deployment with transaction verification and rollback.
+- Later: higher-fidelity LVGL layout preview and optional OTA management.
 
-See [architecture and requested firmware extensions](docs/ARCHITECTURE.md).
+See [architecture](docs/ARCHITECTURE.md) and the [detailed deployment API proposal](docs/DEPLOYMENT_PROTOCOL.md).
 
 ## Project repositories
 
