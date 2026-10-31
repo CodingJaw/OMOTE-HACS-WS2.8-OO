@@ -69,7 +69,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             for path in available:
                 if not is_exportable_json(path):
                     continue
-                content = await api.read_file(path)
+                content = await api.read_file(path, verify_json=True)
                 total += len(content.encode("utf-8"))
                 if total > 512 * 1024:
                     raise HomeAssistantError("Backup exceeds 512 KiB safety limit")

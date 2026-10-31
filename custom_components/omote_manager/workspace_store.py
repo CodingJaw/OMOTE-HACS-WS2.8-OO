@@ -24,6 +24,7 @@ from .workspace_model import (
     editable_commands,
     extract_scene_template,
     file_digest,
+    parse_jsonc,
     validate_bundle,
 )
 
@@ -134,6 +135,15 @@ class WorkspaceStore:
         check_bundle_limits(files)
         if "Scenes.json" not in files:
             raise WorkspaceError("OMOTE is missing Scenes.json")
+        # Do not replace a valid existing draft with corrupt or partial reads.
+        # Syntax acceptance, including comments, matches the live OMOTE parser.
+        for path, raw in files.items():
+            try:
+                parsed = parse_jsonc(raw)
+            except WorkspaceError as exc:
+                raise WorkspaceError(f"Invalid imported file {path}: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise WorkspaceError(f"Invalid top-level JSON object in {path}")
         copied = dict(files)
 
         def operation(state):

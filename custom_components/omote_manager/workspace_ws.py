@@ -91,7 +91,7 @@ async def ws_import(hass: HomeAssistant, connection, msg: dict) -> None:
         files = {}
         total = 0
         for path in paths:
-            text = await coordinator.api.read_file(path)
+            text = await coordinator.api.read_file(path, verify_json=True)
             total += len(text.encode("utf-8"))
             if total > MAX_TOTAL_BYTES:
                 raise WorkspaceError("Import exceeds 512 KiB limit")
@@ -109,7 +109,7 @@ async def ws_import(hass: HomeAssistant, connection, msg: dict) -> None:
         _LOGGER.warning("OMOTE draft import failed: %s", exc)
         connection.send_error(
             msg["id"], websocket_api.ERR_UNKNOWN_ERROR,
-            "Remote configuration import failed; check integration logs"
+            f"Import aborted; saved draft unchanged. {str(exc)[:380]}"
         )
         return
     _result(hass, connection, msg)

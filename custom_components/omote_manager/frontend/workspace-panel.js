@@ -24,7 +24,7 @@ class OmoteWorkspaceStudio {
   _build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev5";
+    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev6";
     this.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "studio pane";

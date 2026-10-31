@@ -194,6 +194,20 @@ class TestWorkspaceStorage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reloaded.summary()["revision"], 2)
         self.assertTrue(any(loc["id"] == lounge for loc in reloaded.summary()["locations"]))
 
+    async def test_invalid_import_does_not_replace_existing_draft(self):
+        workspace = store.WorkspaceStore({})
+        await workspace.async_load()
+        good = sample_bundle()
+        await workspace.async_import(0, "remote_a", good)
+        before = workspace.summary()["drafts"]["remote_a"]
+        damaged = dict(good)
+        damaged["Commands/TV.json"] = damaged["Commands/TV.json"][:100]
+        with self.assertRaisesRegex(model.WorkspaceError, "Invalid imported file"):
+            await workspace.async_import(1, "remote_a", damaged, replace=True)
+        after = workspace.summary()["drafts"]["remote_a"]
+        self.assertEqual(workspace.summary()["revision"], 1)
+        self.assertEqual(after, before)
+
     async def test_templates_shared_between_remote_drafts(self):
         workspace = store.WorkspaceStore({})
         await workspace.async_load()
