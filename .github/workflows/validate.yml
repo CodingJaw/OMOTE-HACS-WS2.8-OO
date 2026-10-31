@@ -1,0 +1,26 @@
+name: Validate integration
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python modules
+        run: python -m compileall -q custom_components
+      - name: Validate JSON metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ('hacs.json',):
+              json.loads(Path(name).read_text())
+          for path in Path('custom_components').rglob('*.json'):
+              json.loads(path.read_text())
+          print('JSON metadata valid')
+          PY

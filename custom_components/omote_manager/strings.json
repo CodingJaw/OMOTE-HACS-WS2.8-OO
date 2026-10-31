@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect an OMOTE remote",
+        "description": "Enter the address of your OMOTE configuration API. The initial release reads configuration without changing it.",
+        "data": {
+          "host": "Hostname or IP address",
+          "port": "API port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to a compatible omote-config-v1 API"
+    },
+    "abort": {
+      "already_configured": "This OMOTE endpoint is already configured"
+    }
+  }
+}
