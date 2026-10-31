@@ -11,7 +11,8 @@
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to a compatible omote-config-v1 API"
+      "cannot_connect": "Cannot connect to a compatible omote-config-v1 API",
+      "invalid_host": "Enter a valid hostname or IPv4 address"
     },
     "abort": {
       "already_configured": "This OMOTE endpoint is already configured"
