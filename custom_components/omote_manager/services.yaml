@@ -1,0 +1,26 @@
+refresh:
+  name: Refresh
+  description: Refresh one OMOTE remote's connection status and filesystem inventory.
+  fields:
+    entry_id:
+      name: Integration entry ID
+      description: Home Assistant config entry ID of the OMOTE remote.
+      required: true
+      example: "01JBEXAMPLE000000000000000"
+      selector:
+        text:
+
+backup_configuration:
+  name: Back up configuration
+  description: >-
+    Save up to three non-sensitive OMOTE JSON configuration snapshots in
+    Home Assistant's .storage directory. Secrets and DeviceSettings.json
+    are excluded. This does not modify the remote.
+  fields:
+    entry_id:
+      name: Integration entry ID
+      description: Home Assistant config entry ID of the OMOTE remote.
+      required: true
+      example: "01JBEXAMPLE000000000000000"
+      selector:
+        text:

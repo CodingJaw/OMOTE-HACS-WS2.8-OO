@@ -1,29 +1,125 @@
-"""OMOTE Manager integration.
+"""OMOTE Manager Home Assistant integration.
 
-Read-only firmware access by default. Explicit deployment will require a
-verified, transactional firmware API in a future milestone.
+The current OMOTE firmware does not offer transactional configuration writes.
+This version supports read-only monitoring and explicit local backups only.
 """
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from datetime import datetime, timezone
+import hashlib
+import logging
 
-from .api import OmoteApi
-from .const import DOMAIN
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
+
+from .api import OmoteApi, OmoteApiError
+from .const import (
+    DOMAIN,
+    SAFE_PREFIXES,
+    SAFE_ROOT_FILES,
+    SENSITIVE_FILES,
+)
 from .coordinator import OmoteCoordinator
 
+_LOGGER = logging.getLogger(__name__)
+
 PLATFORMS = ["sensor", "binary_sensor"]
+SERVICE_BACKUP = "backup_configuration"
+SERVICE_REFRESH = "refresh"
+ENTRY_SCHEMA = vol.Schema({vol.Required("entry_id"): str})
+
+
+def _safe_backup_file(path: str) -> bool:
+    """Only export JSON user-config files; never back up credentials."""
+    if (
+        not path.endswith(".json")
+        or path.startswith("/")
+        or ".." in path
+        or "\\" in path
+        or path.split("/")[-1] in SENSITIVE_FILES
+    ):
+        return False
+    return path in SAFE_ROOT_FILES or path.startswith(SAFE_PREFIXES)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the integration domain."""
+    """Set up the integration and read-only management actions."""
     hass.data.setdefault(DOMAIN, {})
+
+    def _coordinator(call: ServiceCall) -> OmoteCoordinator:
+        entry_id = call.data["entry_id"]
+        coordinator = hass.data[DOMAIN].get(entry_id)
+        if coordinator is None:
+            raise HomeAssistantError("OMOTE entry not found or not loaded")
+        return coordinator
+
+    async def async_refresh(call: ServiceCall) -> None:
+        """Immediately refresh status and filesystem inventory."""
+        await _coordinator(call).async_request_refresh()
+
+    async def async_backup(call: ServiceCall) -> None:
+        """Store the last three nonsensitive snapshots under HA .storage.
+
+        Files are backed up as their original UTF-8 text, preserving comments.
+        This is not a full-device backup; secrets and device settings are excluded.
+        """
+        coordinator = _coordinator(call)
+        entry_id = call.data["entry_id"]
+        api = coordinator.api
+        try:
+            await api.status()
+            available = await api.files()
+            saved = {}
+            total = 0
+            for path in available:
+                if not _safe_backup_file(path):
+                    continue
+                content = await api.read_file(path)
+                total += len(content.encode("utf-8"))
+                if total > 512 * 1024:
+                    raise HomeAssistantError("Backup exceeds 512 KiB safety limit")
+                saved[path] = content
+            if not saved:
+                raise HomeAssistantError("No eligible configuration files found")
+            digest = hashlib.sha256()
+            for path, content in sorted(saved.items()):
+                digest.update(path.encode("utf-8"))
+                digest.update(b"\x00")
+                digest.update(content.encode("utf-8"))
+                digest.update(b"\x00")
+            snapshot = {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "files": saved,
+                "sha256": digest.hexdigest(),
+            }
+            store = Store(hass, 1, f"{DOMAIN}.backups_{entry_id}")
+            prior = await store.async_load() or {}
+            history = prior.get("snapshots", [])
+            history.append(snapshot)
+            await store.async_save({"snapshots": history[-3:]})
+            _LOGGER.info(
+                "Saved OMOTE backup for %s: %d files, SHA256 %s",
+                entry_id, len(saved), digest.hexdigest(),
+            )
+        except OmoteApiError as exc:
+            raise HomeAssistantError(f"OMOTE backup failed: {exc}") from exc
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_REFRESH, async_refresh, schema=ENTRY_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_BACKUP, async_backup, schema=ENTRY_SCHEMA
+    )
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Connect to an individual OMOTE remote."""
+    """Connect to one independently configured OMOTE remote."""
     api = OmoteApi(
         async_get_clientsession(hass),
         entry.data["host"],
@@ -37,7 +133,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload all entities and stop polling."""
+    """Stop polling and unload entities for a remote."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         hass.data[DOMAIN].pop(entry.entry_id, None)
