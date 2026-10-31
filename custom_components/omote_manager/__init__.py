@@ -1,7 +1,7 @@
 """OMOTE Manager Home Assistant integration.
 
 The current OMOTE firmware does not offer transactional configuration writes.
-This version supports read-only monitoring and explicit local backups only.
+This version supports read-only monitoring, local backups, and HA-only drafts.
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ from .const import DOMAIN
 from .coordinator import OmoteCoordinator
 from .panel import async_register_manager_panel
 from .safe_files import is_exportable_json
+from .workspace_store import WorkspaceStore
+from .workspace_ws import STORE_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +36,9 @@ ENTRY_SCHEMA = vol.Schema({vol.Required("entry_id"): str})
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration and read-only management actions."""
     hass.data.setdefault(DOMAIN, {})
+    workspace = WorkspaceStore(hass)
+    await workspace.async_load()
+    hass.data[STORE_KEY] = workspace
     await async_register_manager_panel(hass)
 
     def _coordinator(call: ServiceCall) -> OmoteCoordinator:

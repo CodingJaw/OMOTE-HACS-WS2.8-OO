@@ -1,0 +1,75 @@
+/* OMOTE Profile Studio. Reuses Home Assistant theme tokens and panel basics. */
+.studio { margin-top: 18px; overflow: visible; padding: 0; }
+.studio-heading { padding: 22px 24px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.studio-heading h2 { font-size: 23px; margin: 0 0 7px; font-weight: 700; }
+.studio-heading .muted { margin: 0; font-size: 12px; }
+.studio-guard {
+  background: var(--secondary-background-color, #edf2f8);
+  color: var(--secondary-text-color, #4c6071); border: 1px solid var(--divider-color, #e1e6ec);
+  padding: 9px 13px; border-radius: 999px; font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; white-space: nowrap;
+}
+.studio-toolbar {
+  padding: 17px 24px; display: flex; justify-content: space-between;
+  align-items: center; gap: 20px;
+  background: var(--secondary-background-color, #f5f7fa);
+  border-top: 1px solid var(--divider-color, #e2e7ee);
+  border-bottom: 1px solid var(--divider-color, #e2e7ee);
+}
+.studio-toolbar strong { font-size: 14px; }
+.studio-toolbar p { font-size: 11px; margin: 5px 0 0; }
+.studio-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.studio-buttons button, .studio-form button {
+  border-radius: 8px; border: 1px solid var(--divider-color, #d9e0e9);
+  padding: 10px 13px; background: var(--card-background-color, #fff);
+  font-size: 12px; font-weight: 700;
+}
+.studio-buttons button.primary, .studio-form button.primary {
+  color: #fff; background: var(--primary-color, #1976d2); border-color: var(--primary-color, #1976d2);
+}
+.studio-buttons button.secondary:hover, .studio-form button.secondary:hover { background: var(--secondary-background-color, #eef4fa); }
+.studio-buttons button:disabled, .studio-form button:disabled { background: var(--secondary-background-color, #e9edf1); color: var(--secondary-text-color, #91a0ac); border-color: var(--divider-color, #dfe5eb); }
+.studio-message { border-bottom: 1px solid var(--divider-color, #dae5ef); padding: 12px 24px; background: var(--secondary-background-color, #f0f5fc); font-size: 12px; }
+.studio-message:empty { display: none; }
+.studio-message.error { color: var(--error-color, #b73737); border-color: var(--error-color, #b73737); }
+.studio-columns { display: grid; grid-template-columns: minmax(175px, .95fr) minmax(225px, 1.1fr) minmax(260px, 1.5fr); gap: 0; }
+.studio-card { min-width: 0; padding: 23px 20px; border-right: 1px solid var(--divider-color, #e6ebef); }
+.studio-card:last-child { border-right: 0; }
+.studio-card header { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 9px; }
+.studio-card header h3 { font-size: 14px; font-weight: 700; margin: 0; }
+.studio-card header .muted { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.studio-help { color: var(--secondary-text-color, #687a87); margin: 0 0 16px; font-size: 12px; line-height: 1.6; min-height: 35px; }
+.studio-list { background: var(--secondary-background-color, #f7f9fc); border: 1px solid var(--divider-color, #e4ebf1); border-radius: 9px; max-height: 245px; overflow: auto; margin-bottom: 20px; }
+.studio-item { font-size: 12px; padding: 10px 13px; border-bottom: 1px solid var(--divider-color, #e7edf3); overflow-wrap: anywhere; }
+.studio-item:last-child { border-bottom: 0; }
+.studio-item strong { display: block; font-size: 12px; margin-bottom: 6px; }
+.studio-item small { display: block; color: var(--secondary-text-color, #6f7f8f); line-height: 1.5; }
+.studio-empty { font-size: 12px; padding: 15px; margin: 0; line-height: 1.6; color: var(--secondary-text-color, #8a97a4); }
+.studio-form { display: grid; gap: 13px; }
+.studio-form label { font-size: 11px; font-weight: 700; display: grid; gap: 7px; }
+.studio-form input, .studio-form select, .studio-form textarea {
+  width: 100%; min-width: 0; padding: 10px; border-radius: 7px;
+  background: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #273543);
+  border: 1px solid var(--divider-color, #cdd7e1); font: inherit;
+  font-weight: 400; font-size: 12px;
+}
+.studio-form input:focus-visible, .studio-form select:focus-visible, .studio-form textarea:focus-visible {
+  outline: 2px solid var(--primary-color, #1976d2); outline-offset: 1px;
+}
+.studio-form textarea { resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.55; }
+.studio-form small { font-size: 11px; font-weight: 400; line-height: 1.6; }
+.studio-rule { border-bottom: 1px solid var(--divider-color, #e7edf2); margin: 19px 0; }
+.studio-validation { padding: 22px 24px; border-top: 1px solid var(--divider-color, #e2e8ef); }
+.studio-validation-heading { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 13px; }
+.studio-validation-heading h3 { font-size: 14px; }
+.studio-validation-heading .muted { font-size: 11px; }
+.studio-issues { color: var(--secondary-text-color, #6e7c89); font-size: 12px; line-height: 1.65; max-height: 460px; overflow: auto; }
+.studio-validation-ok { color: var(--success-color, #14784c); font-weight: 700; }
+.studio-validation-error { color: var(--error-color, #af4343); font-weight: 700; }
+.studio-issue { display: flex; gap: 5px; flex-direction: column; margin: 6px 0; padding: 10px 12px; border-radius: 7px; background: var(--secondary-background-color, #f8f9fa); border: 1px solid var(--divider-color, #e1e4e7); }
+.studio-issue strong { font-size: 10px; letter-spacing: .04em; }
+.studio-issue.is-error strong { color: var(--error-color, #b83e3e); }
+.studio-issue.is-warning strong { color: var(--warning-color, #b88612); }
+@media (max-width: 1120px) { .studio-columns { grid-template-columns: 1fr 1fr; } .studio-command-card { grid-column: 1 / -1; border-top: 1px solid var(--divider-color, #e5ebef); } .studio-card:nth-child(2) { border-right: 0; } }
+@media (max-width: 720px) { .studio-heading, .studio-toolbar { padding: 17px 13px; flex-wrap: wrap; } .studio-heading h2 { font-size: 20px; } .studio-guard { font-size: 9px; } .studio-columns { grid-template-columns: 1fr; } .studio-card { border-right: 0; border-bottom: 1px solid var(--divider-color, #e6ebef); padding: 18px 14px; } .studio-command-card { grid-column: 1; } .studio-validation { padding: 18px 14px; } }

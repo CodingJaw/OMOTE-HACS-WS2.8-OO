@@ -37,3 +37,9 @@ Scenes.json references Scenes/*.json. Scene files reference Pages/*.json and Com
 4. Notification of changed configuration revision.
 
 Firmware code must not be changed without separate approval. The HACS integration remains independent of network IR router and USB HID firmware.
+
+## HA-only Profile Studio (0.1.0-dev4)
+
+The `WorkspaceStore` maintains named hierarchical locations, reusable scene templates and per-remote draft file snapshots in Home Assistant private storage, using monotonically increasing revisions for optimistic concurrency. Imports and templates exclude device settings, HA credentials and secret files. A shared template is a byte-exact source scene plus recursively referenced pages and command files; its Scene index entry is stored separately to avoid overwriting a destination's entire Scenes.json file. Templates copy only into a second remote's HA draft and reject conflicting file paths. Command editing updates the original OMOTE Mode / Protocol / Data fields while retaining unknown keys. OMOTE JSON with line/block comments is supported for reading and validation; editing one command file normalizes its comments. Validation checks parse errors, Scenes.json references, scene page references, page command file references and command field semantics, but cannot certify actual IR/HA hardware operation. Firmware deployment remains entirely disabled.
+
+The HA WebSocket workspace endpoints require HA administrator authorization and are not exposed directly to the LAN. No changes to the firmware repository are required for this milestone.

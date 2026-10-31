@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev3 — read-only; no firmware writes.**
+**Development build 0.1.0-dev4 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -32,7 +32,21 @@ After restarting Home Assistant, the **OMOTE Manager** sidebar entry opens an ad
 
 The panel is implemented using the `panel_custom` and WebSocket APIs available in Home Assistant 2024.9.1. Static resources are served by the integration; no external scripts or cloud services are used.
 
-The sidebar is **read-only** in this development version. It is not yet the command/profile editor or a graphical button/page editor, and it cannot deploy changes to OMOTE.
+### Profile Studio (local drafts)
+
+The sidebar now contains **Profile Studio**, an authenticated, admin-only workspace:
+
+1. Select an OMOTE remote and click **Import remote JSON**. It reads only approved scene, page, command, device, and action files, excluding known settings and credentials.
+2. Create named **locations** (Home, Living Room, Bedroom) and child locations.
+3. Save a **shared scene template**, including referenced pages and commands, into HA's private storage; copy it into another remote's **local draft**. Existing files with different contents are never overwritten.
+4. Choose a `Commands/*.json` file, select an IR or MQTT command, edit its protocol and data fields, then **Save command in draft**.
+5. Click **Validate draft** to check JSON syntax, OMOTE scene/page/command references and command fields.
+
+Edits remain in `.storage/omote_manager.workspace` on the Home Assistant host across restarts. Original files are retained alongside the draft to detect local modifications. The editor normalizes the modified command file's formatting and drops comments *in that edited file only*; all other imported JSON text is preserved.
+
+**Firmware deployment is intentionally disabled.** Current OMOTE configuration writes are unauthenticated and non-transactional. The integration does not overwrite live files, reboot the device, or expose OTA updates. Template application affects only HA drafts. Profiles are extracted from existing OMOTE Scene objects; we do not invent incompatible firmware object formats.
+
+The original live file browser remains read-only. Future milestones will add safe deployment and the touchscreen page layout editor.
 
 ### Entities
 

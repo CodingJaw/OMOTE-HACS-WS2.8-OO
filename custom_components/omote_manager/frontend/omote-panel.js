@@ -14,6 +14,7 @@ class OmoteManagerPanel extends HTMLElement {
     this._category = "Scenes";
     this._loading = false;
     this._fileRequest = 0;
+    this.workspace = null;
   }
 
   set hass(hass) {
@@ -32,12 +33,12 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev3">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev4">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
       '    <p class="subtitle">Central configuration workspace for your OMOTE remotes</p></div>' +
-      '    <span class="pill">READ-ONLY PREVIEW</span>' +
+      '    <span class="pill">PROFILE STUDIO</span>' +
       '  </header>' +
       '  <div id="notice" role="status" aria-live="polite"></div>' +
       '  <section class="summary" id="summary"></section>' +
@@ -61,7 +62,7 @@ class OmoteManagerPanel extends HTMLElement {
       '        <pre id="file-preview" tabindex="0">Select a configuration file to inspect its contents.</pre></section>' +
       '      </div>' +
       '      <div class="footer-note">Settings and credentials are excluded from file previews. ' +
-      '      Editing, profile deployment and firmware updates are not enabled in this version.</div>' +
+      '      Live JSON previews are read-only; Profile Studio saves editable drafts in Home Assistant. Deployment remains disabled.</div>' +
       '    </main>' +
       '  </div>' +
       '</div>';
@@ -70,6 +71,11 @@ class OmoteManagerPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("backup").addEventListener("click", () => {
       void this.backupSelected();
+    });
+    void import("./workspace-panel.js?v=0.1.0-dev4").then(({ attachWorkspace }) => {
+      if (this._mounted) this.workspace = attachWorkspace(this);
+    }).catch((error) => {
+      this._notice("Profile Studio could not load: " + String(error), true);
     });
     if (this._hass && !this._started) {
       this._started = true;
@@ -99,6 +105,7 @@ class OmoteManagerPanel extends HTMLElement {
         this._selectedFile = null;
       }
       this.renderOverview();
+      if (this.workspace) void this.workspace.refresh();
       this._notice("");
     } catch (error) {
       this._notice("Unable to load OMOTE data: " + String(error.message || error), true);
@@ -177,6 +184,7 @@ class OmoteManagerPanel extends HTMLElement {
         this._fileRequest += 1;
         this.renderRemotes(remotes);
         this.renderFiles();
+        if (this.workspace) this.workspace.onRemoteChanged();
       });
       list.append(button);
     }
