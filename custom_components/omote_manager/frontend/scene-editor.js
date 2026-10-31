@@ -10,7 +10,9 @@ class SceneEditor {
     this.token = 0;
     this.diffToken = 0;
     this.busy = false;
+    this.layoutEditor = null;
     this.create();
+    void this.loadLayoutEditor();
     this.render();
   }
 
@@ -22,7 +24,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev7";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev8";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -134,12 +136,24 @@ class SceneEditor {
     }
   }
 
+  async loadLayoutEditor() {
+    try {
+      const module = await import("./layout-editor.js?v=0.1.0-dev8");
+      this.layoutEditor = module.attachVisualLayoutEditor(this);
+      this.layoutEditor.render();
+    } catch (error) {
+      console.error("OMOTE visual layout editor failed to initialize", error);
+      this.note("Visual layout editor unavailable: " + String(error.message || error), true);
+    }
+  }
+
   onRemoteChanged() {
     this.scenePath = "";
     this.pageIndex = 0;
     this.widgetIndex = 0;
     this.detail = null;
     this.diffPath = "";
+    if (this.layoutEditor) this.layoutEditor.onRemoteChanged();
     ++this.token;
     ++this.diffToken;
     this.render();
@@ -161,6 +175,7 @@ class SceneEditor {
       for (const form of ["se-scene-form","se-page-form","se-widget-form","se-key-form"]) {
         this.enable(form, false);
       }
+      if (this.layoutEditor) this.layoutEditor.render();
     } else if (!this.detail || this.detail.scene_path !== this.scenePath) {
       void this.loadScene();
     }
@@ -214,7 +229,10 @@ class SceneEditor {
     for (const id of ["se-page-form", "se-widget-form", "se-key-form"]) {
       this.enable(id, Boolean(page));
     }
-    if (!page) return;
+    if (!page) {
+      if (this.layoutEditor) this.layoutEditor.render();
+      return;
+    }
     const form = this.ui("se-page-form");
     form.elements.name.value = page.name;
     form.elements.short_name.value = page.short_name;
@@ -235,6 +253,7 @@ class SceneEditor {
       this.detail.event_types.map(event => [event,event]),
       keyForm.elements.event.value || "Press");
     this.showKey();
+    if (this.layoutEditor) this.layoutEditor.render();
   }
 
   showWidget(resetSlot = true) {

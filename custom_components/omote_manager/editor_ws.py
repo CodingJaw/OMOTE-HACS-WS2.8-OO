@@ -147,6 +147,42 @@ async def ws_edit_widget(hass: HomeAssistant, connection, msg: dict) -> None:
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "omote_manager/editor/edit-layout",
+        vol.Required("revision"): _POSITIVE_INT,
+        vol.Required("entry_id"): str,
+        vol.Required("scene_path"): str,
+        vol.Required("page_index"): _POSITIVE_INT,
+        vol.Required("widget_index"): _POSITIVE_INT,
+        vol.Required("settings"): vol.Schema(
+            {
+                vol.Required("mode"): vol.In(("flow", "align", "absolute")),
+                vol.Required("align_to"): _POSITIVE_INT,
+                vol.Required("x_pct"): _POSITIVE_INT,
+                vol.Required("y_pct"): _POSITIVE_INT,
+                vol.Optional("width_pct", default=None): vol.Any(None, _POSITIVE_INT),
+                vol.Optional("height_pct", default=None): vol.Any(None, _POSITIVE_INT),
+            }
+        ),
+    }
+)
+@websocket_api.async_response
+async def ws_edit_layout(hass: HomeAssistant, connection, msg: dict) -> None:
+    """Save a widget layout in HA-only draft storage."""
+    if not _admin(connection, msg):
+        return
+    try:
+        await _workspace(hass).async_edit_widget_layout(
+            msg["revision"], msg["entry_id"], msg["scene_path"],
+            msg["page_index"], msg["widget_index"], msg["settings"],
+        )
+    except WorkspaceError as exc:
+        _bad(connection, msg, exc)
+        return
+    _result(hass, connection, msg)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "omote_manager/editor/edit-button",
         vol.Required("revision"): _POSITIVE_INT,
         vol.Required("entry_id"): str,
@@ -217,6 +253,6 @@ def register_editor_websockets(hass: HomeAssistant) -> None:
     """Register all editor commands using HA Core 2024.9 WebSocket APIs."""
     for handler in (
         ws_scene, ws_edit_scene, ws_edit_page, ws_edit_widget,
-        ws_edit_button, ws_diff, ws_revert,
+        ws_edit_button, ws_edit_layout, ws_diff, ws_revert,
     ):
         websocket_api.async_register_command(hass, handler)

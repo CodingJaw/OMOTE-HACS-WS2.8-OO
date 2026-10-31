@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev7 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev8 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -46,7 +46,7 @@ Edits remain in `.storage/omote_manager.workspace` on the Home Assistant host ac
 
 **Firmware deployment is intentionally disabled.** Current OMOTE configuration writes are unauthenticated and non-transactional. The integration does not overwrite live files, reboot the device, or expose OTA updates. Template application affects only HA drafts. Profiles are extracted from existing OMOTE Scene objects; we do not invent incompatible firmware object formats.
 
-The original live file browser remains read-only. Future milestones will add safe deployment and the touchscreen page layout editor.
+The original live file browser remains read-only. Safe firmware deployment is a future milestone.
 
 ### Entities
 
@@ -65,13 +65,13 @@ The integration can read the live device settings and schema through its API cli
 
 The current firmware's configuration HTTP interface uses **unauthenticated HTTP** and permissive CORS. Do not expose it to the Internet or untrusted LAN clients. This integration deliberately exposes **no write, delete, or reboot actions** while the firmware lacks authenticated, transactional deployment.
 
-### Important: complete-file import fix (v0.1.0-dev7)
+### Important: complete-file import fix (v0.1.0-dev8)
 
 Earlier versions accidentally treated one `aiohttp` stream read as a complete response. On ESP32 this could import partial JSON and produce many false syntax errors. This release drains the entire response, compares the number of bytes with `/api/fs/stat`, and falls back to verified offset-based chunked reads if needed. Before replacing an existing draft, every imported file is syntactically validated (including OMOTE's JSON comments). A failed import keeps the previous draft unchanged.
 
 If you previously imported a corrupt draft, select the remote and click **Import remote JSON** again, accepting the local-draft replacement prompt. This replaces the HOME ASSISTANT draft only. Then run **Validate draft**. If it still reports errors, check the newly reported details; they may be genuine missing command references or files that differ from the firmware repository.
 
-### Scene / page / button editor and draft comparison (v0.1.0-dev7)
+### Scene / page / button editor and draft comparison (v0.1.0-dev8)
 
 Within **Profile Studio**, scroll past the Command Editor to **Scenes, pages & button assignments**:
 
@@ -85,9 +85,19 @@ All changes use the unmodified OMOTE firmware JSON structures and are saved only
 
 For safety, the editor restricts command bindings to names already present in the corresponding command file, taking each scene's CommandPrefix into account. To select another command, first add it to the corresponding firmware-format command file in a future milestone. After editing, select **Validate draft** to inspect cross-file references. The diff viewer is local only and is not a deploy/restore interface.
 
+### Visual touchscreen page layout (v0.1.0-dev8)
+
+The **Visual page layout** section within **Profile Studio → Scenes, pages & button assignments** displays a schematic portrait **240 × 320 px** Waveshare screen and the selected page's widgets. It reads current `HeightPct`, `AlignTo`, `PosX`, `PosY` and `SizeXY` fields from the imported JSON.
+
+Select a widget in the dropdown or click its preview box. The inspector can place a widget in automatic flow, align it to an earlier widget, or assign explicit `PosX` and `PosY` values (0–100%); widgets that support `SizeXY` can also have percentage width/height. Movable preview widgets may be dragged to propose a new position. **Dragging is not an automatic save**: select **Save layout to draft** to commit the change to HA storage, then **Validate draft** and inspect the original-vs-draft diff.
+
+**Firmware interpretation matters:** `SizeXY` and `PosX`/`PosY` are percentages despite their names. Image widgets use a separate `SizeXYinPixels` field which is not edited in this milestone. Original `Label`/`Title` widgets support height and alignment but not explicit absolute positions. Actual LVGL sizes, fonts, tabs, widget-specific rendering and status-bar height are not reproduced exactly: the preview is a **schematic**, not a device emulator. Changes to a page file affect every scene referring to that shared page.
+
+Deployment remains disabled. No image assets are uploaded, no device commands are sent, and no firmware files are modified.
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev7, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev8, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Planned milestones
 

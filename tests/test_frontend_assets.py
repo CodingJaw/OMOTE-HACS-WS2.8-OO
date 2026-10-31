@@ -47,6 +47,13 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("attachSceneEditor", scene_module.read_text())
         self.assertIn("scene-editor.js?v=", (FRONTEND / "workspace-panel.js").read_text())
         self.assertIn("register_editor_websockets", (ROOT / "workspace_ws.py").read_text())
+        visual = FRONTEND / "layout-editor.js"
+        self.assertTrue(visual.is_file())
+        self.assertIn("attachVisualLayoutEditor", visual.read_text())
+        self.assertIn("layout-editor.js?v=", scene_module.read_text())
+        self.assertTrue((FRONTEND / "layout-editor.css").is_file())
+        self.assertIn("omote_manager/editor/edit-layout", (ROOT / "editor_ws.py").read_text())
+        self.assertIn("layout_description", (ROOT / "editor_model.py").read_text())
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from .editor_model import (
     edit_scene,
     edit_page_title,
     edit_widget,
+    edit_widget_layout,
     edit_button_map,
     draft_diff,
     revert_draft_file,
@@ -344,6 +345,20 @@ class WorkspaceStore:
             draft["files"] = edit_widget(
                 draft["files"], scene_path, page_index, widget_index,
                 field=field, value=value, command_index=command_index,
+            )
+        await self._mutate(revision, operation)
+
+    async def async_edit_widget_layout(
+        self, revision: int, entry_id: str, scene_path: str, page_index: int,
+        widget_index: int, settings: dict[str, Any],
+    ) -> None:
+        """Edit widget placement within one private HA draft revision."""
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Missing local draft")
+            draft["files"] = edit_widget_layout(
+                draft["files"], scene_path, page_index, widget_index, settings
             )
         await self._mutate(revision, operation)
 

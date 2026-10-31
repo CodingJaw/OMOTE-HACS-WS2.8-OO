@@ -11,6 +11,7 @@ import difflib
 from typing import Any
 
 from .safe_files import is_exportable_json
+from .layout_model import layout_description, update_widget_layout
 from .workspace_model import WorkspaceError, check_bundle_limits, dump_json, parse_jsonc
 
 # Exact KeyPressAbstract::KeyId names in waveshare28v2-port.
@@ -127,6 +128,7 @@ def scene_detail(files: dict[str, str], scene_path: str) -> dict[str, Any]:
                                  and isinstance(widget.get("Text"), str),
                 "editable_command": widget.get("Type") in EDITABLE_WIDGET_TYPES
                                     and isinstance(widget.get("Command"), (str, list)),
+                "layout": layout_description(widget),
             })
         result.append({
             "index": ix,
@@ -268,6 +270,30 @@ def edit_widget(
             raise WorkspaceError("Unsupported widget command shape")
     else:
         raise WorkspaceError("Widget field must be text or command")
+    return _write(files, {path: page})
+
+
+def edit_widget_layout(
+    files: dict[str, str],
+    scene_path: str,
+    page_index: int,
+    widget_index: int,
+    settings: dict[str, Any],
+) -> dict[str, str]:
+    """Change existing widget coordinates/sizing in one HA-only draft file.
+
+    The same page can be referenced by multiple scenes; edit is deliberately
+    made against the referenced page JSON rather than against a scene copy.
+    """
+    _, _, path, page = _page(files, scene_path, page_index)
+    widgets = page.get("Widgets")
+    if not isinstance(widgets, list) or type(widget_index) is not int or not (
+        0 <= widget_index < len(widgets)
+    ):
+        raise WorkspaceError("Invalid widget index")
+    widgets[widget_index] = update_widget_layout(
+        widgets[widget_index], settings, widget_index
+    )
     return _write(files, {path: page})
 
 
