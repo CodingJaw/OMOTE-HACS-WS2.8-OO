@@ -20,7 +20,7 @@ class VisualLayoutEditor {
   build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/layout-editor.css?v=0.1.0-dev12";
+    stylesheet.href = "/omote_manager_static/layout-editor.css?v=0.1.0-dev13";
     this.studio.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "layout-editor";

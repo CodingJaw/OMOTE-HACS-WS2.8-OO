@@ -8,6 +8,10 @@
           "host": "Hostname or IP address",
           "port": "API port"
         }
+      },
+      "zeroconf_confirm": {
+        "title": "Confirm discovered OMOTE remote",
+        "description": "Home Assistant discovered **{name}** at **{host}**. Confirm this remote to add it for read-only configuration management. Discovery is not secure pairing and does not authorize firmware writes."
       }
     },
     "error": {
@@ -15,7 +19,9 @@
       "invalid_host": "Enter a valid hostname or IPv4 address"
     },
     "abort": {
-      "already_configured": "This OMOTE endpoint is already configured"
+      "already_configured": "This OMOTE endpoint is already configured",
+      "invalid_discovery": "The mDNS announcement was invalid or untrusted",
+      "cannot_connect": "The discovered OMOTE API could not be verified"
     }
   }
 }

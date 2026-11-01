@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev12 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev13 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -134,9 +134,19 @@ The inspector reports API generation, authentication mode, advertised transactio
 
 The preview implementation exists on the firmware's `feature/config-v2-transactional` branch, not on the known-good `waveshare28v2-port` branch. Do not flash an untested firmware preview as a replacement for a working remote without a recovery procedure.
 
+### Automatic mDNS discovery and manual IP setup (v0.1.0-dev13)
+
+OMOTE Manager now declares `_omote._tcp.local.` Zeroconf discovery in its Home Assistant integration manifest and depends on Home Assistant's shared `zeroconf` integration. On supported firmware, Home Assistant displays a discovered OMOTE device under **Settings → Devices & services**, with a **Confirm discovered OMOTE remote** flow. Confirmation only adds the read-only device; it is **not** secure pairing or deployment authorization.
+
+The announcement is implemented only on firmware's isolated `feature/config-v2-transactional` preview branch. **The current known-good `waveshare28v2-port` firmware does not announce the new service; do not expect automatic discovery until this compatible preview is explicitly tested and flashed.** The working OMOTE Manager manual setup remains available for all supported `omote-config-v1` devices.
+
+The firmware mDNS service advertises `id=<12-digit device MAC hex>`, `api=omote-config-v1` and `model=waveshare28v2`. HACS checks the service metadata, local IP, valid port, and actual HTTP status before offering confirmation. It avoids duplicate integrations when an existing remote is configured with the same IP or `hostname.local`. The identifier is **only an untrusted discovery hint**, not a secure pairing identity. Discovery does not silently change a configured remote's IP address; verified authenticated identity matching must precede automatic address migration.
+
+Your security decisions are binding: initial pairing requires a touchscreen one-time code, and **every individual deployment must subsequently require both HA administrator confirmation and a fresh local touchscreen approval on the target remote**. All v1 and v2 preview firmware stays non-deployable in HACS. See [HACS v2 deployment issue](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues/2) and [firmware issue](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev12, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev13, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 
