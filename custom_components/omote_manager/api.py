@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import MAX_BACKUP_FILE_BYTES, SUPPORTED_API
+from .capability_model import CapabilitiesError, summarize_capabilities
 from .workspace_model import WorkspaceError, parse_jsonc
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +62,35 @@ class OmoteApi:
                 f"Unsupported OMOTE API: {status.get('api')!r}"
             )
         return status
+
+    async def capabilities(self) -> dict[str, Any]:
+        """Inspect optional read-only config-v2 capability metadata.
+
+        A 404 means the older firmware has no v2 endpoint. All capability
+        results are fail-closed and NEVER grant access to write methods.
+        """
+        endpoint = "/api/config/v2/capabilities"
+        try:
+            async with asyncio.timeout(12):
+                async with self._session.get(
+                    self._base + endpoint,
+                    timeout=ClientTimeout(total=10),
+                    allow_redirects=False,
+                ) as response:
+                    if response.status == 404:
+                        return summarize_capabilities(None)
+                    if response.status != 200:
+                        raise OmoteApiError(
+                            f"Capability request returned HTTP {response.status}"
+                        )
+                    payload = await self._read_complete(response, 8192)
+        except (ClientError, asyncio.TimeoutError) as exc:
+            raise OmoteApiError(f"Read-only capability request failed: {exc}") from exc
+        try:
+            obj = json.loads(payload.decode("utf-8"))
+            return summarize_capabilities(obj)
+        except (UnicodeDecodeError, ValueError, CapabilitiesError) as exc:
+            raise OmoteApiError(f"Invalid firmware capability metadata: {exc}") from exc
 
     async def files(self) -> list[str]:
         """Enumerate JSON files without downloading their contents."""

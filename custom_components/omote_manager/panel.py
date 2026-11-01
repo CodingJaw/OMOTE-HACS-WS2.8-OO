@@ -21,9 +21,9 @@ from .safe_files import is_exportable_json
 from .workspace_ws import register_workspace_websockets
 
 PANEL_PATH = "omote-manager"
-PANEL_ELEMENT = "omote-manager-panel-v11"
+PANEL_ELEMENT = "omote-manager-panel-v12"
 STATIC_PATH = "/omote_manager_static"
-ASSET_VERSION = "0.1.0-dev11"
+ASSET_VERSION = "0.1.0-dev12"
 
 
 async def async_register_manager_panel(hass: HomeAssistant) -> None:
@@ -34,6 +34,7 @@ async def async_register_manager_panel(hass: HomeAssistant) -> None:
     )
     websocket_api.async_register_command(hass, websocket_overview)
     websocket_api.async_register_command(hass, websocket_file)
+    websocket_api.async_register_command(hass, websocket_capabilities)
     register_workspace_websockets(hass)
     await panel_custom.async_register_panel(
         hass,
@@ -142,3 +143,35 @@ async def websocket_file(hass: HomeAssistant, connection, msg: dict) -> None:
         )
         return
     connection.send_result(msg["id"], {"path": path, "content": content})
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "omote_manager/capabilities",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_capabilities(
+    hass: HomeAssistant, connection, msg: dict
+) -> None:
+    """Read public v2 firmware capabilities, always returning no deploy permission."""
+    if not _admin_only(connection, msg):
+        return
+    coordinator = hass.data.get(DOMAIN, {}).get(msg["entry_id"])
+    if coordinator is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND,
+            "The selected OMOTE remote is not loaded",
+        )
+        return
+    try:
+        info = await coordinator.api.capabilities()
+    except OmoteApiError:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_UNKNOWN_ERROR,
+            "Could not inspect firmware capability metadata",
+        )
+        return
+    # A remote's self-advertisement must never grant write authorization.
+    info["deployment_enabled"] = False
+    connection.send_result(msg["id"], info)

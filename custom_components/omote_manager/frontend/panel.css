@@ -154,3 +154,19 @@ pre {
   .panel-nav > .muted { width: 100%; margin-left: 0; }
   .panel-nav .nav-pill { padding: 9px 12px; }
 }
+
+/* Read-only capability audit from firmware v1 / config-v2 preview. */
+.capability-inspector {
+  padding: 11px 14px;
+  margin: 0 0 14px;
+  border: 1px solid var(--divider-color, #d8e0e8);
+  background: var(--secondary-background-color, #f5f7fa);
+  border-radius: 9px;
+  color: var(--secondary-text-color, #536477);
+  line-height: 1.55;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.capability-inspector strong { display: block; color: var(--primary-text-color, #222); }
+.capability-inspector p { margin: 5px 0; font-size: 11px; }
+#inspect-capabilities:disabled { opacity: .5; cursor: not-allowed; }

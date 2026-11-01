@@ -14,6 +14,8 @@ class OmoteManagerPanel extends HTMLElement {
     this._category = "Scenes";
     this._loading = false;
     this._fileRequest = 0;
+    this._capabilityRequest = 0;
+    this._capabilityEntry = null;
     this.workspace = null;
     // Versioned panel name prevents HA from retaining older custom elements.
   }
@@ -34,7 +36,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev11">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev12">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -58,8 +60,10 @@ class OmoteManagerPanel extends HTMLElement {
       '        <div><p class="eyebrow">SELECTED DEVICE</p><h2 id="device-title">Select a remote</h2>' +
       '        <p id="device-subtitle" class="muted"></p></div>' +
       '        <div class="actions"><button type="button" id="refresh" class="secondary">Refresh</button>' +
-      '        <button type="button" id="backup" class="primary">Back up JSON</button></div>' +
+      '        <button type="button" id="backup" class="primary">Back up JSON</button>' +
+      '        <button type="button" id="inspect-capabilities" class="secondary">Check firmware safety</button></div>' +
       '      </div>' +
+      '      <div id="capability-inspector" class="capability-inspector" role="status" aria-live="polite">Select a remote to check firmware security features.</div>' +
       '      <div id="categories" class="categories" aria-label="Configuration categories"></div>' +
       '      <div class="content-grid">' +
       '        <section class="file-pane"><h3>Configuration files</h3><div id="file-list"></div></section>' +
@@ -82,6 +86,9 @@ class OmoteManagerPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("backup").addEventListener("click", () => {
       void this.backupSelected();
+    });
+    this.shadowRoot.getElementById("inspect-capabilities").addEventListener("click", () => {
+      void this.inspectCapabilities();
     });
     this.shadowRoot.getElementById("nav-overview").addEventListener("click", () => {
       this._navigateTo("overview");
@@ -113,7 +120,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev11");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev12");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -258,6 +265,15 @@ class OmoteManagerPanel extends HTMLElement {
       ? ((remote.host || "Unknown host") + " · " + (remote.api || "API unavailable")) : "";
     const backup = this.shadowRoot.getElementById("backup");
     backup.disabled = !remote || !remote.online;
+    this.shadowRoot.getElementById("inspect-capabilities").disabled =
+      !remote || !remote.online;
+    if (this._capabilityEntry !== (remote ? remote.entry_id : null)) {
+      this._capabilityEntry = remote ? remote.entry_id : null;
+      this._capabilityRequest++;
+      this.shadowRoot.getElementById("capability-inspector").textContent =
+        remote ? "Select Check firmware safety to inspect read-only capabilities."
+          : "Select a remote to inspect its firmware capabilities.";
+    }
     const categories = this.shadowRoot.getElementById("categories");
     categories.replaceChildren();
     const files = remote ? remote.files || [] : [];
@@ -333,6 +349,53 @@ class OmoteManagerPanel extends HTMLElement {
     }
   }
 
+
+  async inspectCapabilities() {
+    const remote = this.selectedRemote();
+    if (!remote || !remote.online || !this._hass) return;
+    const request = ++this._capabilityRequest;
+    const button = this.shadowRoot.getElementById("inspect-capabilities");
+    const view = this.shadowRoot.getElementById("capability-inspector");
+    button.disabled = true;
+    view.textContent = "Reading optional config-v2 capability metadata…";
+    try {
+      const info = await this._hass.callWS({
+        type: "omote_manager/capabilities",
+        entry_id: remote.entry_id
+      });
+      if (request !== this._capabilityRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      view.replaceChildren();
+      const title = document.createElement("strong");
+      title.textContent = info.preview_only
+        ? "Firmware: read-only v2 preview"
+        : info.generation === "legacy-v1"
+          ? "Firmware: legacy configuration API"
+          : "Firmware: v2 capability advertisement";
+      const values = document.createElement("p");
+      values.textContent =
+        "API " + info.api_version +
+        " · Authentication: " + info.auth_mode +
+        " · Transactions: " + (info.transaction_support ? "advertised" : "unavailable") +
+        " · Rollback: " + (info.rollback_support ? "advertised" : "unavailable") +
+        " · Deployment: DISABLED";
+      const note = document.createElement("p");
+      note.textContent = info.explanation ||
+        "Deployments remain disabled until hardware approval.";
+      view.append(title, values, note);
+    } catch (error) {
+      if (request !== this._capabilityRequest) return;
+      view.textContent =
+        "Capability inspection unavailable: " + String(error.message || error) +
+        ". No remote configuration was changed.";
+    } finally {
+      if (request === this._capabilityRequest &&
+          remote.entry_id === this._selectedRemote) {
+        button.disabled = false;
+      }
+    }
+  }
+
   async backupSelected() {
     const remote = this.selectedRemote();
     if (!remote || !this._hass) return;
@@ -357,6 +420,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v11")) {
-  customElements.define("omote-manager-panel-v11", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v12")) {
+  customElements.define("omote-manager-panel-v12", OmoteManagerPanel);
 }

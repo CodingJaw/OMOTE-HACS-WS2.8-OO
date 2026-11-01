@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev11 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev12 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -126,9 +126,17 @@ Use **Back up JSON** in the Overview section to capture a fresh configuration. T
 
 Important limitations: these backups deliberately exclude `HaSettings.json`, `DeviceSettings.json`, credential/settings files, non-JSON assets and the complete LittleFS image. They are reference snapshots, not full-device recovery images; custom JSON may still contain sensitive user configuration. When upgrading from older snapshots, verification is performed on read using the same SHA-256 algorithm as previous versions.
 
+### Read-only config-v2 capability inspector (v0.1.0-dev12)
+
+Select a remote in **OMOTE Manager → Overview** and click **Check firmware safety**. The integration reads only `GET /api/config/v2/capabilities`. Legacy devices that return HTTP 404 are identified as v1 read-only; the firmware branch's `omote-config-v2-preview` is identified as a preview, with transaction/rollback/authentication explicitly unavailable. Invalid, redirecting or oversized responses are rejected.
+
+The inspector reports API generation, authentication mode, advertised transaction/rollback support and an explanation. Device identifiers and raw revision hashes are not displayed. **No capability response can enable deployment in this release, even if every advertised field is positive.** HACS must wait for the finished secure protocol, hardware power-failure tests and explicit rollout approval. Existing v1 status, import and backup compatibility remains intact.
+
+The preview implementation exists on the firmware's `feature/config-v2-transactional` branch, not on the known-good `waveshare28v2-port` branch. Do not flash an untested firmware preview as a replacement for a working remote without a recovery procedure.
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev11, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev12, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 

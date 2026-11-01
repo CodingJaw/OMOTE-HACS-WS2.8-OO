@@ -86,6 +86,14 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("studio-backup-select", workspace_js)
         self.assertIn("loadBackupDraft()", workspace_js)
         self.assertIn("does NOT restore", workspace_js)
+        capability_panel = (ROOT / "panel.py").read_text()
+        capability_api = (ROOT / "api.py").read_text()
+        self.assertIn("omote_manager/capabilities", capability_panel)
+        self.assertIn("async def capabilities", capability_api)
+        self.assertIn("allow_redirects=False", capability_api)
+        self.assertIn("inspect-capabilities", panel_js)
+        self.assertIn("deployment_enabled", (ROOT / "capability_model.py").read_text())
+
 
 
 
