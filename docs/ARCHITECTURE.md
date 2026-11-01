@@ -89,3 +89,14 @@ The administrator-only `omote_manager/capabilities` websocket endpoint uses an a
 Manifest `zeroconf: ["_omote._tcp.local."]` with `zeroconf` dependency delegates mDNS watching to Home Assistant's built-in discovery service. Config flow requires a stable lowercase efuse MAC TXT hint, the expected protocol/model marker and a private IPv4 address, verifies `/api/status`, then presents `zeroconf_confirm` without creating an entry automatically. Manual host/port setup is retained and duplicate hosts or `hostname.local` entries abort. Known discovery IDs do not trigger unauthenticated silent IP changes. Discovery identifiers are explicitly untrusted and do not authorize pairing, transactions or firmware writes.
 
 The firmware service is announced only in the isolated config-v2 feature branch. A separate host-testable firmware state machine models the per-deployment physical touchscreen approval gate, but it is not connected to network commits. The final authenticated protocol and Waveshare hardware power-loss tests remain blockers for enabling deployment. Existing Home Assistant Core 2024.9.1 setup and storage formats are unchanged.
+
+## Preview storage inspector (v0.1.0-dev14)
+
+A bounded, non-redirecting, read-only `GET /api/config/v2/storage/status`
+is made only when the capability endpoint identifies the experimental v2
+preview. `capability_model.summarize_storage_status` validates expected
+LittleFS capacities, NVS slot flags, sequence and selector state; malformed
+responses fail closed. The sidebar shows capacity/selector diagnostics but
+never enables a deployment operation, regardless of any remote-reported
+`generation_activation_enabled` value. The firmware does not write or
+initialize NVS while serving the diagnostic request.

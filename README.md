@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev13 — Home Assistant draft editing; no firmware writes.**
+**Development build 0.1.0-dev14 — Home Assistant draft editing; no firmware writes.**
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -144,9 +144,24 @@ The firmware mDNS service advertises `id=<12-digit device MAC hex>`, `api=omote-
 
 Your security decisions are binding: initial pairing requires a touchscreen one-time code, and **every individual deployment must subsequently require both HA administrator confirmation and a fresh local touchscreen approval on the target remote**. All v1 and v2 preview firmware stays non-deployable in HACS. See [HACS v2 deployment issue](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues/2) and [firmware issue](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
 
+### LittleFS and boot-selector diagnostics (v0.1.0-dev14)
+
+The **Check firmware safety** button on the OMOTE Manager Overview now also reads
+`GET /api/config/v2/storage/status` when the experimental firmware advertises
+`omote-config-v2-preview`. The panel shows LittleFS total/used/estimated-free
+capacity and the read-only NVS selector health flags. It never reads private
+credentials or writes NVS, flash objects or configurations.
+
+The firmware currently advertises `generation_activation_enabled=false` and
+does not initialize a generation selector merely by inspecting it. On a
+freshly flashed preview, `selector_initialized=false` is expected. NVS
+`nvs_readable=false` on an uninitialized namespace is not by itself evidence
+of filesystem failure. Treat these values as diagnostic only; **no deployment
+or rollback becomes enabled**.
+
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev13, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev14, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 

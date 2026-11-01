@@ -16,7 +16,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import MAX_BACKUP_FILE_BYTES, SUPPORTED_API
-from .capability_model import CapabilitiesError, summarize_capabilities
+from .capability_model import CapabilitiesError, summarize_capabilities, summarize_storage_status
 from .workspace_model import WorkspaceError, parse_jsonc
 
 _LOGGER = logging.getLogger(__name__)
@@ -91,6 +91,30 @@ class OmoteApi:
             return summarize_capabilities(obj)
         except (UnicodeDecodeError, ValueError, CapabilitiesError) as exc:
             raise OmoteApiError(f"Invalid firmware capability metadata: {exc}") from exc
+
+    async def storage_status(self) -> dict[str, Any]:
+        """Read optional, non-secret LittleFS/NVS diagnostics without mutations."""
+        path = "/api/config/v2/storage/status"
+        try:
+            async with asyncio.timeout(12):
+                async with self._session.get(
+                    self._base + path,
+                    timeout=ClientTimeout(total=10),
+                    allow_redirects=False,
+                ) as response:
+                    if response.status == 404:
+                        return summarize_storage_status(None)
+                    if response.status != 200:
+                        raise OmoteApiError(
+                            f"Storage diagnostics returned HTTP {response.status}"
+                        )
+                    raw = await self._read_complete(response, 8192)
+        except (ClientError, asyncio.TimeoutError) as exc:
+            raise OmoteApiError("Read-only storage diagnostics failed") from exc
+        try:
+            return summarize_storage_status(json.loads(raw.decode("utf-8")))
+        except (UnicodeDecodeError, ValueError, CapabilitiesError) as exc:
+            raise OmoteApiError("Invalid firmware storage diagnostics") from exc
 
     async def files(self) -> list[str]:
         """Enumerate JSON files without downloading their contents."""

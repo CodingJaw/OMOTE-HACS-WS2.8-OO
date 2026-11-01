@@ -101,6 +101,10 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("async_step_zeroconf_confirm", flow)
         self.assertIn("self._matching_entry", flow)
         self.assertIn("self.async_show_form", flow)
+        self.assertIn("storage_status", panel_js)
+        self.assertIn("async def storage_status", capability_api)
+        self.assertIn("summarize_storage_status", (ROOT / "capability_model.py").read_text())
+
 
 
 

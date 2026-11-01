@@ -36,7 +36,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev13">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev14">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -120,7 +120,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev13");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev14");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -383,6 +383,27 @@ class OmoteManagerPanel extends HTMLElement {
       note.textContent = info.explanation ||
         "Deployments remain disabled until hardware approval.";
       view.append(title, values, note);
+      if (info.preview_only) {
+        const storage = info.storage_status || {};
+        const diagnostics = document.createElement("p");
+        diagnostics.className = "capability-storage";
+        if (storage.available) {
+          const kib = bytes => (Number(bytes) / 1024).toFixed(0) + " KiB";
+          diagnostics.textContent = "LittleFS: " +
+            kib(storage.used_bytes) + " used / " +
+            kib(storage.total_bytes) + " total · " +
+            kib(storage.estimated_free_bytes) + " estimated free · " +
+            "NVS readable: " + (storage.nvs_readable ? "yes" : "no") + " · " +
+            "Selector initialized: " +
+            (storage.selector_initialized ? "yes" : "no") +
+            " · slots valid: " + Number(storage.slot0_valid) + "/" +
+            Number(storage.slot1_valid) + " · Generation activation: DISABLED";
+        } else {
+          diagnostics.textContent =
+            "LittleFS and boot-selector diagnostics are unavailable on this firmware.";
+        }
+        view.append(diagnostics);
+      }
     } catch (error) {
       if (request !== this._capabilityRequest) return;
       view.textContent =
@@ -420,6 +441,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v13")) {
-  customElements.define("omote-manager-panel-v13", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v14")) {
+  customElements.define("omote-manager-panel-v14", OmoteManagerPanel);
 }

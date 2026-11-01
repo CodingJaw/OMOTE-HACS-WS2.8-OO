@@ -49,6 +49,16 @@ def preview():
     }
 
 
+def storage():
+    return {
+        "storage": "littlefs", "total_bytes": 6_000_000,
+        "used_bytes": 2_000_000, "estimated_free_bytes": 4_000_000,
+        "nvs_readable": True, "slot0_valid": True,
+        "slot1_valid": False, "selector_initialized": True,
+        "selector_sequence": 3, "generation_activation_enabled": False
+    }
+
+
 class TestNormalization(unittest.TestCase):
     def test_legacy_is_explicitly_non_deployable(self):
         info = capability.summarize_capabilities(None)
@@ -87,6 +97,29 @@ class TestNormalization(unittest.TestCase):
         self.assertNotIn("device-123", str(info))
         self.assertNotIn("a" * 64, str(info))
 
+    def test_read_only_storage_diagnostics_validation(self):
+        info = capability.summarize_storage_status(storage())
+        self.assertEqual(info["estimated_free_bytes"], 4_000_000)
+        self.assertTrue(info["selector_initialized"])
+        self.assertFalse(info["generation_activation_enabled"])
+        self.assertFalse(capability.summarize_storage_status(None)["available"])
+
+    def test_storage_fail_closed_on_unsupported_flags_and_sizes(self):
+        for edits in [
+            {"total_bytes": -1},
+            {"used_bytes": 8_000_000},
+            {"estimated_free_bytes": 5_000_000},
+            {"selector_initialized": 1},
+            {"generation_activation_enabled": "false"},
+            {"storage": "sdcard"},
+        ]:
+            invalid = storage()
+            invalid.update(edits)
+            with self.subTest(edits=edits), self.assertRaises(
+                capability.CapabilitiesError
+            ):
+                capability.summarize_storage_status(invalid)
+
     def test_missing_field_wrong_types_and_digest_rejected(self):
         invalids = []
         missing = preview()
@@ -115,6 +148,7 @@ class TestReadOnlyProbe(unittest.IsolatedAsyncioTestCase):
         self.requests = []
         app = web.Application()
         app.router.add_route("*", "/api/config/v2/capabilities", self._respond)
+        app.router.add_route("*", "/api/config/v2/storage/status", self._storage)
         self.runner = web.AppRunner(app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, "127.0.0.1", 0)
@@ -138,6 +172,28 @@ class TestReadOnlyProbe(unittest.IsolatedAsyncioTestCase):
         if self.mode == "malformed":
             return web.Response(text="{", content_type="application/json")
         return web.json_response(preview())
+
+    async def _storage(self, request):
+        self.requests.append(request.method)
+        if self.mode == "legacy":
+            return web.Response(status=404)
+        if self.mode == "malformed":
+            return web.Response(text="{", content_type="application/json")
+        return web.json_response(storage())
+
+    async def test_storage_request_is_read_only(self):
+        result = await self.api.storage_status()
+        self.assertTrue(result["available"])
+        self.assertEqual(self.requests, ["GET"])
+        self.mode = "legacy"
+        missing = await self.api.storage_status()
+        self.assertFalse(missing["available"])
+        self.assertEqual(self.requests, ["GET", "GET"])
+
+    async def test_malformed_storage_rejected(self):
+        self.mode = "malformed"
+        with self.assertRaises(api_module.OmoteApiError):
+            await self.api.storage_status()
 
     async def test_preview_read_only(self):
         response = await self.api.capabilities()

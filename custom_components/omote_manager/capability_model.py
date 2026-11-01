@@ -113,3 +113,49 @@ def summarize_capabilities(payload: dict | None) -> dict[str, Any]:
             "hardware recovery tests are approved."
         ),
     }
+
+
+def summarize_storage_status(payload: dict | None) -> dict[str, Any]:
+    """Validate read-only v2 storage diagnostics without enabling activation."""
+    if payload is None:
+        return {
+            "available": False,
+            "storage": "",
+            "total_bytes": 0,
+            "used_bytes": 0,
+            "estimated_free_bytes": 0,
+            "selector_initialized": False,
+            "nvs_readable": False,
+            "slot0_valid": False,
+            "slot1_valid": False,
+            "selector_sequence": 0,
+            "generation_activation_enabled": False,
+        }
+    if not isinstance(payload, dict) or payload.get("storage") != "littlefs":
+        raise CapabilitiesError("Invalid v2 storage identifier")
+    for name in (
+        "nvs_readable", "slot0_valid", "slot1_valid",
+        "selector_initialized", "generation_activation_enabled",
+    ):
+        if type(payload.get(name)) is not bool:
+            raise CapabilitiesError(f"Invalid storage flag: {name}")
+    total = _quantity(payload, "total_bytes")
+    used = _quantity(payload, "used_bytes")
+    free = _quantity(payload, "estimated_free_bytes")
+    sequence = _quantity(payload, "selector_sequence")
+    if used > total or free > total or free > total - used:
+        raise CapabilitiesError("Inconsistent LittleFS storage counters")
+    return {
+        "available": True,
+        "storage": "littlefs",
+        "total_bytes": total,
+        "used_bytes": used,
+        "estimated_free_bytes": free,
+        "selector_initialized": payload["selector_initialized"],
+        "nvs_readable": payload["nvs_readable"],
+        "slot0_valid": payload["slot0_valid"],
+        "slot1_valid": payload["slot1_valid"],
+        "selector_sequence": sequence,
+        # This is only the remote's report, not permission to deploy.
+        "generation_activation_enabled": payload["generation_activation_enabled"],
+    }
