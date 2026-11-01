@@ -5,8 +5,6 @@ This version supports read-only monitoring, local backups, and HA-only drafts.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import hashlib
 import logging
 
 import voluptuous as vol
@@ -15,14 +13,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.storage import Store
 
 from .api import OmoteApi, OmoteApiError
 from .const import DOMAIN
+from .backup_history import OmoteBackupHistory
 from .coordinator import OmoteCoordinator
 from .panel import async_register_manager_panel
-from .safe_files import is_exportable_json
 from .workspace_store import WorkspaceStore
+from .workspace_model import WorkspaceError
 from .workspace_ws import STORE_KEY
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,51 +51,22 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         await _coordinator(call).async_request_refresh()
 
     async def async_backup(call: ServiceCall) -> None:
-        """Store the last three nonsensitive snapshots under HA .storage.
+        """Capture an integrity-checked JSON subset, retaining three versions.
 
-        Files are backed up as their original UTF-8 text, preserving comments.
-        This is not a full-device backup; secrets and device settings are excluded.
+        No credentials, non-JSON assets, or firmware writes are performed.
+        Existing v0.1.0-dev10 snapshots remain compatible.
         """
         coordinator = _coordinator(call)
         entry_id = call.data["entry_id"]
-        api = coordinator.api
+        backup = OmoteBackupHistory(hass, entry_id)
         try:
-            await api.status()
-            available = await api.files()
-            saved = {}
-            total = 0
-            for path in available:
-                if not is_exportable_json(path):
-                    continue
-                content = await api.read_file(path, verify_json=True)
-                total += len(content.encode("utf-8"))
-                if total > 512 * 1024:
-                    raise HomeAssistantError("Backup exceeds 512 KiB safety limit")
-                saved[path] = content
-            if not saved:
-                raise HomeAssistantError("No eligible configuration files found")
-            digest = hashlib.sha256()
-            for path, content in sorted(saved.items()):
-                digest.update(path.encode("utf-8"))
-                digest.update(b"\x00")
-                digest.update(content.encode("utf-8"))
-                digest.update(b"\x00")
-            snapshot = {
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "files": saved,
-                "sha256": digest.hexdigest(),
-            }
-            store = Store(hass, 1, f"{DOMAIN}.backups_{entry_id}")
-            prior = await store.async_load() or {}
-            history = prior.get("snapshots", [])
-            history.append(snapshot)
-            await store.async_save({"snapshots": history[-3:]})
-            _LOGGER.info(
-                "Saved OMOTE backup for %s: %d files, SHA256 %s",
-                entry_id, len(saved), digest.hexdigest(),
-            )
-        except OmoteApiError as exc:
+            snapshot = await backup.capture(coordinator.api)
+        except (OmoteApiError, WorkspaceError) as exc:
             raise HomeAssistantError(f"OMOTE backup failed: {exc}") from exc
+        _LOGGER.info(
+            "Saved OMOTE backup for %s: %d files, SHA256 %s",
+            entry_id, snapshot["file_count"], snapshot["sha256"],
+        )
 
     hass.services.async_register(
         DOMAIN, SERVICE_REFRESH, async_refresh, schema=ENTRY_SCHEMA

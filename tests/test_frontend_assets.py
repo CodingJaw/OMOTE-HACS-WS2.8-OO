@@ -75,6 +75,18 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("build_deployment_kit", (ROOT / "release_model.py").read_text())
         self.assertIn("proposed", (ROOT / "release_model.py").read_text())
         self.assertIn("rollback", (ROOT / "release_model.py").read_text())
+        backup_history = (ROOT / "backup_history.py").read_text()
+        backup_ws = (ROOT / "backup_ws.py").read_text()
+        workspace_js = (FRONTEND / "workspace-panel.js").read_text()
+        self.assertIn("OmoteBackupHistory", (ROOT / "__init__.py").read_text())
+        self.assertIn("register_backup_websockets", (ROOT / "workspace_ws.py").read_text())
+        self.assertIn("omote_manager/backups/list", backup_ws)
+        self.assertIn("omote_manager/backups/load-to-draft", backup_ws)
+        self.assertIn("snapshot[\"sha256\"]", backup_history)
+        self.assertIn("studio-backup-select", workspace_js)
+        self.assertIn("loadBackupDraft()", workspace_js)
+        self.assertIn("does NOT restore", workspace_js)
+
 
 
 

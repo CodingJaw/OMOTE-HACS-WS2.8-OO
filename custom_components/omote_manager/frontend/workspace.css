@@ -73,3 +73,46 @@
 .studio-issue.is-warning strong { color: var(--warning-color, #b88612); }
 @media (max-width: 1120px) { .studio-columns { grid-template-columns: 1fr 1fr; } .studio-command-card { grid-column: 1 / -1; border-top: 1px solid var(--divider-color, #e5ebef); } .studio-card:nth-child(2) { border-right: 0; } }
 @media (max-width: 720px) { .studio-heading, .studio-toolbar { padding: 17px 13px; flex-wrap: wrap; } .studio-heading h2 { font-size: 20px; } .studio-guard { font-size: 9px; } .studio-columns { grid-template-columns: 1fr; } .studio-card { border-right: 0; border-bottom: 1px solid var(--divider-color, #e6ebef); padding: 18px 14px; } .studio-command-card { grid-column: 1; } .studio-validation { padding: 18px 14px; } }
+
+/* Verified backup history: Home Assistant storage only, never firmware restore. */
+.studio-backup-history {
+  margin: 15px 0 18px;
+  border: 1px solid var(--divider-color, #dce3e9);
+  background: var(--secondary-background-color, #f8fafc);
+  padding: 18px 20px;
+  border-radius: 11px;
+}
+.studio-backup-history header {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 12px;
+}
+.studio-backup-history h3 { margin: 0 0 5px; font-size: 14px; }
+.studio-backup-history p { margin: 4px 0; font-size: 11px; line-height: 1.55; }
+.studio-backup-history button {
+  padding: 10px 13px; font-size: 12px;
+  border-radius: 8px; border: 1px solid var(--divider-color, #cbd6e2);
+  background: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #233041);
+}
+.studio-backup-history button:disabled { opacity: .5; cursor: not-allowed; }
+.studio-backup-actions { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
+.studio-backup-actions label { display: grid; flex: 1; min-width: 205px; gap: 6px; font-size: 11px; font-weight: 700; }
+.studio-backup-actions select {
+  min-width: 0; width: 100%; padding: 9px;
+  border: 1px solid var(--divider-color, #cbd6e2); border-radius: 7px;
+  background: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #233041);
+}
+.studio-backup-actions #studio-backup-load {
+  background: var(--primary-color, #1976d2);
+  color: #fff;
+  border-color: var(--primary-color, #1976d2);
+}
+#studio-backup-info { margin-top: 10px; overflow-wrap: anywhere; }
+#studio-backup-message { color: var(--primary-color, #1976d2); overflow-wrap: anywhere; }
+.studio-backup-warning { border-top: 1px solid var(--divider-color, #dbe3ea); padding-top: 9px; }
+@media (max-width: 700px) {
+  .studio-backup-history { padding: 15px; }
+  .studio-backup-actions { align-items: stretch; }
+  .studio-backup-actions #studio-backup-load { width: 100%; }
+}

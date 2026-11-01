@@ -34,7 +34,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev10">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev11">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -113,7 +113,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev10");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev11");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -344,6 +344,9 @@ class OmoteManagerPanel extends HTMLElement {
         entry_id: remote.entry_id
       });
       this._notice("Backup saved in Home Assistant storage. The remote was not modified.");
+      if (this.workspace && this.workspace.selectedEntry() === remote.entry_id) {
+        void this.workspace.loadBackups();
+      }
     } catch (error) {
       this._notice("Backup failed: " + String(error.message || error), true);
     } finally {
@@ -354,6 +357,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v10")) {
-  customElements.define("omote-manager-panel-v10", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v11")) {
+  customElements.define("omote-manager-panel-v11", OmoteManagerPanel);
 }

@@ -23,6 +23,7 @@ from .workspace_model import (
 )
 from .workspace_store import WorkspaceStore
 from .editor_ws import register_editor_websockets
+from .backup_ws import register_backup_websockets
 
 _LOGGER = logging.getLogger(__name__)
 STORE_KEY = f"{DOMAIN}_workspace"
@@ -277,3 +278,4 @@ def register_workspace_websockets(hass: HomeAssistant) -> None:
     ):
         websocket_api.async_register_command(hass, handler)
     register_editor_websockets(hass)
+    register_backup_websockets(hass)

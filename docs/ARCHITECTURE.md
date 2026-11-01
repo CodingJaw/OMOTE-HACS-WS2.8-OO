@@ -71,3 +71,9 @@ The unified diff viewer classifies lines as added, removed, unchanged context, f
 With live verification selected, the integration rechecks the remote API, inventory and affected file contents before export and refuses known drift/conflicts. It rejects changes to the workspace revision or draft hash while packaging. If the user chooses offline review, the archive is prominently marked `offline_unverified`. The current API does not furnish an atomic remote snapshot or transaction, so even live verification cannot prevent subsequent changes.
 
 The future protocol proposal, including device pairing/authentication, multi-file transactional commit, power-failure recovery and rollback, is documented in `docs/DEPLOYMENT_PROTOCOL.md`. No firmware updates are part of v0.1.0-dev10.
+
+## Verified backup history and local-draft recovery (v0.1.0-dev11)
+
+The original `backup_configuration` Home Assistant service now delegates to `OmoteBackupHistory.capture`, preserving the existing storage key and SHA-256 format and retaining the most recent three snapshots. Each remote file is read completely through `OmoteApi.read_file(...verify_json=True)`, all paths are allowlisted, and each snapshot is validated and hashed before replacing history. Corrupt previous snapshots are marked as damaged instead of being exposed as arbitrary JSON content through the sidebar.
+
+The administrator-only `omote_manager/backups/list` WebSocket command exposes metadata only. `omote_manager/backups/load-to-draft` requires the exact snapshot index, SHA-256, workspace revision and explicit `replace` flag; it verifies both integrity and the registered remote entry before calling `WorkspaceStore.async_import`. This permits recovery of an earlier HA draft while the device is offline but does not issue any firmware write, reboot or restore API request. The UI confirms that restoring a draft discards unsent local edits and that the device remains unchanged.

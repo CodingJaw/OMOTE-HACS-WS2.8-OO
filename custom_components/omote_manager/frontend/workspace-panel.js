@@ -12,6 +12,9 @@ class OmoteWorkspaceStudio {
     this._commandToken = 0;
     this._busy = false;
     this._ready = false;
+    this.backupHistory = [];
+    this.backupEntry = null;
+    this.backupToken = 0;
     this.sceneEditor = null;
     this._build();
     void this._loadSceneEditor();
@@ -26,7 +29,7 @@ class OmoteWorkspaceStudio {
   _build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev10";
+    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev11";
     this.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "studio pane";
@@ -41,6 +44,18 @@ class OmoteWorkspaceStudio {
       '  <div class="studio-buttons"><button id="studio-import" class="primary" type="button">Import remote JSON</button>',
       '  <button id="studio-validate" class="secondary" type="button">Validate draft</button>',
       '  <button id="studio-deploy" type="button" disabled title="Firmware-safe deployment is not implemented">Deploy (unavailable)</button></div></div>',
+      '<section class="studio-backup-history" aria-label="Remote backup history">',
+      '  <header><div><h3>Verified backup history</h3>',
+      '    <p class="muted">Up to three saved JSON subsets per remote. Load into a local draft only.</p></div>',
+      '    <button type="button" id="studio-backup-refresh">Refresh history</button></header>',
+      '  <div class="studio-backup-actions"><label>Saved backup',
+      '    <select id="studio-backup-select"></select></label>',
+      '    <button type="button" id="studio-backup-load" disabled>Load backup into local draft</button></div>',
+      '  <p id="studio-backup-info" class="muted"></p>',
+      '  <p id="studio-backup-message" role="status" aria-live="polite"></p>',
+      '  <p class="muted studio-backup-warning">Does not restore anything to the Waveshare.',
+      '    Full-device firmware, credentials and image assets are not included.</p>',
+      '</section>',
       '<div class="studio-columns">',
       '  <section class="studio-card"><header><h3>1. Locations</h3><span class="muted">Hierarchy</span></header>',
       '    <p class="studio-help">Organize rooms and devices without altering OMOTE firmware JSON.</p>',
@@ -82,6 +97,9 @@ class OmoteWorkspaceStudio {
 
     this.ui("studio-import").addEventListener("click", () => void this.importRemote());
     this.ui("studio-validate").addEventListener("click", () => void this.validate());
+    this.ui("studio-backup-refresh").addEventListener("click", () => void this.loadBackups());
+    this.ui("studio-backup-load").addEventListener("click", () => void this.loadBackupDraft());
+    this.ui("studio-backup-select").addEventListener("change", () => this.renderBackups());
     this.ui("studio-new-location").addEventListener("submit", event => {
       event.preventDefault();
       void this.createLocation(event.currentTarget);
@@ -111,7 +129,7 @@ class OmoteWorkspaceStudio {
 
   async _loadSceneEditor() {
     try {
-      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev10");
+      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev11");
       this.sceneEditor = attachSceneEditor(this);
     } catch (error) {
       console.error("OMOTE scene/page editor failed to initialize", error);
@@ -200,6 +218,10 @@ class OmoteWorkspaceStudio {
   }
 
   onRemoteChanged() {
+    this.backupEntry = null;
+    this.backupHistory = [];
+    ++this.backupToken;
+    this.renderBackups();
     if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
     this.selectedFile = "";
     this.selectedCommand = "";
@@ -219,10 +241,95 @@ class OmoteWorkspaceStudio {
       : "No local draft imported for this remote";
     this.ui("studio-import").disabled = this._busy || !remote || !remote.online;
     this.ui("studio-validate").disabled = this._busy || !draft;
+    if (this.backupEntry !== this.selectedEntry()) {
+      void this.loadBackups();
+    }
     this.renderLocations();
     this.renderTemplates();
     this.renderCommands();
     if (this.sceneEditor) this.sceneEditor.render();
+  }
+
+  async loadBackups() {
+    const remote = this.selectedEntry();
+    const token = ++this.backupToken;
+    this.backupEntry = remote;
+    this.backupHistory = [];
+    this.ui("studio-backup-message").textContent = remote
+      ? "Loading saved backup history…" : "";
+    this.renderBackups();
+    if (!remote || !this.hass()) return;
+    try {
+      const result = await this.hass().callWS({
+        type: "omote_manager/backups/list", entry_id: remote
+      });
+      if (token !== this.backupToken || this.selectedEntry() !== remote) return;
+      this.backupHistory = result.snapshots || [];
+      this.ui("studio-backup-message").textContent = "";
+    } catch (error) {
+      if (token !== this.backupToken) return;
+      this.ui("studio-backup-message").textContent =
+        "Could not load backups: " + String(error.message || error);
+    }
+    this.renderBackups();
+  }
+
+  renderBackups() {
+    const chooser = this.ui("studio-backup-select");
+    const selected = chooser.value;
+    const backups = this.backupHistory || [];
+    this.select(chooser, backups.map(snapshot => [
+      String(snapshot.index),
+      (snapshot.created_at || "Unknown date") + " · " +
+        (snapshot.integrity === "verified" ? "Verified" : "Damaged")
+    ]), selected);
+    const current = backups.find(item => String(item.index) === chooser.value);
+    const valid = current && current.integrity === "verified";
+    this.ui("studio-backup-load").disabled = this._busy || !valid;
+    chooser.disabled = !backups.length;
+    this.ui("studio-backup-refresh").disabled = !this.selectedEntry();
+    this.ui("studio-backup-info").textContent = current
+      ? (valid
+        ? current.file_count + " JSON files · " + current.bytes +
+          " bytes · SHA-256 " + current.sha256.slice(0, 16) + "…"
+        : "This backup failed its integrity check and cannot be loaded.")
+      : this.selectedEntry()
+        ? "No saved backups. Use Back up JSON in the Overview section."
+        : "Select a remote to view its saved backups.";
+  }
+
+  async loadBackupDraft() {
+    const current = this.backupHistory.find(item =>
+      String(item.index) === this.ui("studio-backup-select").value
+    );
+    if (!current || current.integrity !== "verified" ||
+        !this.selectedEntry() || !this.data) return;
+    const entry = this.selectedEntry();
+    const existing = Boolean(this.draft());
+    if (!window.confirm(
+      "Load the saved JSON backup from " + current.created_at +
+      " into the HOME ASSISTANT local draft for this remote? " +
+      (existing
+        ? "This REPLACES all unsent edits currently in that draft. "
+        : "") +
+      "It does NOT restore, overwrite or restart the physical Waveshare."
+    )) return;
+    const completed = await this.change({
+      type: "omote_manager/backups/load-to-draft",
+      entry_id: entry, index: Number(current.index),
+      sha256: current.sha256, replace: existing
+    }, "Backup copied into the local draft; remote remains unchanged.");
+    if (completed) {
+      this.selectedFile = "";
+      this.selectedCommand = "";
+      this.commands = [];
+      if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
+      this.ui("studio-backup-message").textContent =
+        "Integrity-checked backup loaded into Home Assistant draft only.";
+      this.ui("studio-issues").textContent =
+        "Backup loaded. Run Validate draft before further editing.";
+      this.render();
+    }
   }
 
   renderLocations() {

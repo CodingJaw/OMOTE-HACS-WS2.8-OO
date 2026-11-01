@@ -30,7 +30,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev10";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev11";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -177,7 +177,7 @@ class SceneEditor {
 
   async loadLayoutEditor() {
     try {
-      const module = await import("./layout-editor.js?v=0.1.0-dev10");
+      const module = await import("./layout-editor.js?v=0.1.0-dev11");
       this.layoutEditor = module.attachVisualLayoutEditor(this);
       this.layoutEditor.render();
     } catch (error) {
