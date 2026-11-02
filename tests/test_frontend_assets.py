@@ -104,6 +104,9 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("storage_status", panel_js)
         self.assertIn("async def storage_status", capability_api)
         self.assertIn("summarize_storage_status", (ROOT / "capability_model.py").read_text())
+        self.assertIn("single-active", panel_js)
+        self.assertNotIn("Generation activation: DISABLED", panel_js)
+        self.assertIn("recovery_required", panel_js)
 
 
 

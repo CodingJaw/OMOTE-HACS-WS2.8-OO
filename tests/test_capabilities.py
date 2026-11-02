@@ -91,6 +91,7 @@ class TestNormalization(unittest.TestCase):
         info = capability.summarize_capabilities(advertised)
         self.assertEqual(info["generation"], "v2-advertised")
         self.assertTrue(info["transaction_support"])
+        self.assertFalse(info["rollback_support"])
         self.assertTrue(info["device_identity_available"])
         self.assertTrue(info["active_revision_available"])
         self.assertFalse(info["deployment_enabled"])
@@ -100,8 +101,9 @@ class TestNormalization(unittest.TestCase):
     def test_read_only_storage_diagnostics_validation(self):
         info = capability.summarize_storage_status(storage())
         self.assertEqual(info["estimated_free_bytes"], 4_000_000)
-        self.assertTrue(info["selector_initialized"])
-        self.assertFalse(info["generation_activation_enabled"])
+        self.assertEqual(info["storage_model"], "unknown")
+        self.assertEqual(info["config_mode"], "unknown")
+        self.assertFalse(info["deployment_enabled"])
         self.assertFalse(capability.summarize_storage_status(None)["available"])
 
     def test_storage_fail_closed_on_unsupported_flags_and_sizes(self):
@@ -109,8 +111,6 @@ class TestNormalization(unittest.TestCase):
             {"total_bytes": -1},
             {"used_bytes": 8_000_000},
             {"estimated_free_bytes": 5_000_000},
-            {"selector_initialized": 1},
-            {"generation_activation_enabled": "false"},
             {"storage": "sdcard"},
         ]:
             invalid = storage()
@@ -120,10 +120,67 @@ class TestNormalization(unittest.TestCase):
             ):
                 capability.summarize_storage_status(invalid)
 
+    def test_single_active_legacy_and_recovery_status(self):
+        legacy = storage()
+        legacy.update({
+            "storage_model": "single-active", "config_mode": "legacy",
+            "recovery_required": False, "recovery_reason": "",
+            "active_revision_sha256": "",
+        })
+        info = capability.summarize_storage_status(legacy)
+        self.assertEqual(info["config_mode"], "legacy")
+        self.assertFalse(info["deployment_enabled"])
+        self.assertNotIn("slot0_valid", info)
+        active = dict(legacy, config_mode="active",
+                      active_revision_sha256="a" * 64)
+        self.assertEqual(
+            capability.summarize_storage_status(active)["active_revision_sha256"],
+            "a" * 64,
+        )
+        recovering = dict(active, config_mode="recovery",
+                          recovery_required=True,
+                          recovery_reason="active-graph-invalid")
+        info = capability.summarize_storage_status(recovering)
+        self.assertTrue(info["recovery_required"])
+        self.assertEqual(info["recovery_reason"], "active-graph-invalid")
+        self.assertFalse(info["deployment_enabled"])
+
+    def test_single_active_inconsistent_modes_fail_closed(self):
+        base = dict(storage(), storage_model="single-active",
+                    config_mode="legacy", recovery_required=False,
+                    recovery_reason="", active_revision_sha256="")
+        for change in [
+            {"config_mode": "pending"},
+            {"config_mode": "recovery", "recovery_required": False},
+            {"config_mode": "active", "active_revision_sha256": ""},
+            {"active_revision_sha256": "b" * 64},
+            {"recovery_reason": "bad\\nsecret"},
+            {"recovery_required": 0},
+            {"storage_model": "dual"},
+            {"active_revision_sha256": "bad"},
+        ]:
+            data = dict(base, **change)
+            with self.subTest(change=change), self.assertRaises(
+                capability.CapabilitiesError
+            ):
+                capability.summarize_storage_status(data)
+
+    def test_retired_ab_fields_not_required_or_authoritative(self):
+        data = preview()
+        del data["rollback_support"]
+        del data["previous_revision_sha256"]
+        self.assertFalse(capability.summarize_capabilities(data)["deployment_enabled"])
+        old = preview()
+        old["rollback_support"] = True
+        self.assertFalse(capability.summarize_capabilities(old)["rollback_support"])
+        old["previous_revision_sha256"] = "not-a-sha"
+        with self.assertRaises(capability.CapabilitiesError):
+            capability.summarize_capabilities(old)
+
     def test_missing_field_wrong_types_and_digest_rejected(self):
         invalids = []
         missing = preview()
-        del missing["rollback_support"]
+        del missing["transaction_support"]
         invalids.append(missing)
         wrong_bool = preview()
         wrong_bool["transaction_support"] = 1
@@ -179,7 +236,14 @@ class TestReadOnlyProbe(unittest.IsolatedAsyncioTestCase):
             return web.Response(status=404)
         if self.mode == "malformed":
             return web.Response(text="{", content_type="application/json")
-        return web.json_response(storage())
+        data = storage()
+        if self.mode == "single-active":
+            data.update({
+                "storage_model": "single-active", "config_mode": "legacy",
+                "recovery_required": False, "recovery_reason": "",
+                "active_revision_sha256": "",
+            })
+        return web.json_response(data)
 
     async def test_storage_request_is_read_only(self):
         result = await self.api.storage_status()
@@ -194,6 +258,13 @@ class TestReadOnlyProbe(unittest.IsolatedAsyncioTestCase):
         self.mode = "malformed"
         with self.assertRaises(api_module.OmoteApiError):
             await self.api.storage_status()
+
+    async def test_single_active_http_status(self):
+        self.mode = "single-active"
+        result = await self.api.storage_status()
+        self.assertEqual(result["storage_model"], "single-active")
+        self.assertEqual(result["config_mode"], "legacy")
+        self.assertEqual(self.requests, ["GET"])
 
     async def test_preview_read_only(self):
         response = await self.api.capabilities()
