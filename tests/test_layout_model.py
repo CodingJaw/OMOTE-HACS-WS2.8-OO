@@ -92,7 +92,11 @@ class TestLayoutModel(unittest.TestCase):
         self.assertNotIn("HeightPct", result)
         self.assertEqual(result["Custom"], "keep")
         self.assertEqual(original["Scenes/TV.json"], updated["Scenes/TV.json"])
-        self.assertEqual(base.validate_bundle(updated), [])
+        # Image assets are not included in JSON-only HA reviews; that warning
+        # is expected and must not make valid layout edits fail validation.
+        issues = base.validate_bundle(updated)
+        self.assertFalse([item for item in issues if item["level"] == "error"])
+        self.assertTrue(any(item["level"] == "warning" for item in issues))
 
     def test_align_and_flow_remove_conflicting_position_fields(self):
         original = sample()
