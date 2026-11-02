@@ -23,6 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 2048
 _READ_TIMEOUT = 35
+_MAX_JSON_RESPONSE_BYTES = 128 * 1024
 
 
 class OmoteApiError(Exception):
@@ -39,16 +40,28 @@ class OmoteApi:
     async def _json(
         self, path: str, *, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        """Read bounded JSON without following firmware-supplied redirects.
+
+        A device may be compromised, incorrectly configured, or running an
+        unexpected API. Never follow its redirect to another local service.
+        """
         try:
             async with asyncio.timeout(20):
                 async with self._session.get(
                     self._base + path,
                     params=params,
                     timeout=ClientTimeout(total=18),
+                    allow_redirects=False,
                 ) as response:
-                    response.raise_for_status()
-                    payload = await response.json(content_type=None)
-        except (ClientError, asyncio.TimeoutError, ValueError) as exc:
+                    if response.status != 200:
+                        raise OmoteApiError(
+                            f"OMOTE API request {path} returned HTTP {response.status}"
+                        )
+                    data = await self._read_complete(
+                        response, _MAX_JSON_RESPONSE_BYTES
+                    )
+            payload = json.loads(data.decode("utf-8"))
+        except (ClientError, asyncio.TimeoutError, ValueError, UnicodeDecodeError) as exc:
             raise OmoteApiError(f"OMOTE API request {path} failed: {exc}") from exc
         if not isinstance(payload, dict):
             raise OmoteApiError(f"OMOTE API returned invalid object for {path}")
@@ -172,6 +185,7 @@ class OmoteApi:
                     self._base + "/api/fs/read/raw",
                     params={"path": path},
                     timeout=ClientTimeout(total=_READ_TIMEOUT - 2),
+                    allow_redirects=False,
                 ) as response:
                     response.raise_for_status()
                     value = await self._read_complete(response, expected_size)
@@ -210,6 +224,7 @@ class OmoteApi:
                             "max": count,
                         },
                         timeout=ClientTimeout(total=_READ_TIMEOUT - 2),
+                        allow_redirects=False,
                     ) as response:
                         response.raise_for_status()
                         # Never accept a different file, offset or total.
