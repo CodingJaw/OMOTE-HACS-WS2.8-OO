@@ -100,3 +100,29 @@ responses fail closed. The sidebar shows capacity/selector diagnostics but
 never enables a deployment operation, regardless of any remote-reported
 `generation_activation_enabled` value. The firmware does not write or
 initialize NVS while serving the diagnostic request.
+
+## Single-active reviewed configurations (feature branch only)
+
+On the isolated `feature/reviewed-config-retention` branch, the WorkspaceStore
+retains one explicitly approved local JSON snapshot per remote in the existing
+HA private workspace key, alongside independent editable drafts and the
+historical three snapshots in `omote_manager.backups_<entry_id>`. It is
+validated again under the workspace's optimistic concurrency lock and bound
+to the exact draft SHA-256. The review is stored as
+`verification=local_validation_only`, never as remote-verified deployment.
+The administrator-only `reviewed/retain` and `reviewed/load-to-draft`
+WebSocket commands never contact firmware. Loading into an existing draft
+requires the replace flag and SHA-256 match.
+
+`single_active_manifest.py` creates a deterministic, sorted,
+UTF-8 byte-exact `omote-config-generation-v1` manifest preview for JSON-only
+snapshots without image references. It does not capture firmware assets,
+device-specific private settings, NVS Wi-Fi secrets, or pairing materials.
+A review ZIP carries `proposed/` and `baseline/` folders; the baseline
+is NOT an A/B device rollback generation. The manifest preview cannot
+authorize uploads and is omitted if images must still be obtained.
+
+**The single-active firmware API is not operational.** The future HA deploy
+workflow must require encrypted pairing, HA administrator confirmation,
+fresh physical touchscreen confirmation on each target and a manually
+authorized resend in recovery. Existing firmware writes remain disabled.

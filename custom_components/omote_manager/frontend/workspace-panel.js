@@ -29,7 +29,7 @@ class OmoteWorkspaceStudio {
   _build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev14";
+    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev16";
     this.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "studio pane";
@@ -44,6 +44,14 @@ class OmoteWorkspaceStudio {
       '  <div class="studio-buttons"><button id="studio-import" class="primary" type="button">Import remote JSON</button>',
       '  <button id="studio-validate" class="secondary" type="button">Validate draft</button>',
       '  <button id="studio-deploy" type="button" disabled title="Firmware-safe deployment is not implemented">Deploy (unavailable)</button></div></div>',
+      '<section class="studio-backup-history" aria-label="Reviewed configuration">',
+      '  <header><div><h3>Retained reviewed configuration</h3>',
+      '    <p class="muted">One validated HA snapshot per remote, independent of draft edits and backup history.</p></div>',
+      '    <button type="button" id="studio-reviewed-load" disabled>Load into HA draft</button></header>',
+      '  <p id="studio-reviewed-status" role="status" class="muted">No reviewed configuration retained.</p>',
+      '  <p class="muted studio-backup-warning">Save a validated review from the scene editor below.',
+      '    This snapshot excludes image assets and settings and has not been deployed.</p>',
+      '</section>',
       '<section class="studio-backup-history" aria-label="Remote backup history">',
       '  <header><div><h3>Verified backup history</h3>',
       '    <p class="muted">Up to three saved JSON subsets per remote. Load into a local draft only.</p></div>',
@@ -97,6 +105,7 @@ class OmoteWorkspaceStudio {
 
     this.ui("studio-import").addEventListener("click", () => void this.importRemote());
     this.ui("studio-validate").addEventListener("click", () => void this.validate());
+    this.ui("studio-reviewed-load").addEventListener("click", () => void this.loadReviewedDraft());
     this.ui("studio-backup-refresh").addEventListener("click", () => void this.loadBackups());
     this.ui("studio-backup-load").addEventListener("click", () => void this.loadBackupDraft());
     this.ui("studio-backup-select").addEventListener("change", () => this.renderBackups());
@@ -129,7 +138,7 @@ class OmoteWorkspaceStudio {
 
   async _loadSceneEditor() {
     try {
-      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev14");
+      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev16");
       this.sceneEditor = attachSceneEditor(this);
     } catch (error) {
       console.error("OMOTE scene/page editor failed to initialize", error);
@@ -244,10 +253,52 @@ class OmoteWorkspaceStudio {
     if (this.backupEntry !== this.selectedEntry()) {
       void this.loadBackups();
     }
+    this.renderReviewed();
     this.renderLocations();
     this.renderTemplates();
     this.renderCommands();
     if (this.sceneEditor) this.sceneEditor.render();
+  }
+
+  renderReviewed() {
+    const reviewed = this.data?.reviewed?.[this.selectedEntry()] || null;
+    const status = this.ui("studio-reviewed-status");
+    const button = this.ui("studio-reviewed-load");
+    button.disabled = this._busy || !reviewed;
+    status.textContent = reviewed
+      ? "Retained " + reviewed.reviewed_at + " · " +
+        reviewed.file_count + " JSON files · " + reviewed.bytes +
+        " bytes · SHA-256 " + reviewed.sha256.slice(0, 16) +
+        "… · LOCAL validation only, not a remote or recovery verification."
+      : this.selectedEntry()
+        ? "No reviewed configuration retained for this remote. Run a review in the scene editor."
+        : "Select a remote to view its retained configuration.";
+  }
+
+  async loadReviewedDraft() {
+    const remote = this.selectedEntry();
+    const reviewed = this.data?.reviewed?.[remote];
+    if (!remote || !reviewed || !this.data) return;
+    const exists = Boolean(this.draft());
+    if (!window.confirm(
+      "Copy the retained reviewed JSON configuration into the HOME ASSISTANT draft for this remote? " +
+      (exists ? "This will REPLACE all unsent edits in the current draft. " : "") +
+      "It will NOT send anything to, restart, or restore the physical Waveshare. " +
+      "Any image assets or settings outside the JSON subset are not included."
+    )) return;
+    const done = await this.change({
+      type: "omote_manager/reviewed/load-to-draft",
+      entry_id: remote, sha256: reviewed.sha256, replace: exists
+    }, "Retained configuration copied into Home Assistant draft; Waveshare unchanged.");
+    if (done) {
+      this.selectedFile = "";
+      this.selectedCommand = "";
+      this.commands = [];
+      ++this._commandToken;
+      if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
+      this.ui("studio-issues").textContent =
+        "Reviewed configuration loaded locally. Revalidate before editing or exporting.";
+    }
   }
 
   async loadBackups() {

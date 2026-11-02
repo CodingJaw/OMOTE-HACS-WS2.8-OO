@@ -1,4 +1,4 @@
-"""Offline deployment-kit archive verification and rollback-package tests."""
+"""Offline deployment-kit archive verification and single-active baseline-package tests."""
 from __future__ import annotations
 
 from io import BytesIO
@@ -74,14 +74,19 @@ class TestReleaseArchive(unittest.TestCase):
             self.assertIn("READ_ME_FIRST.txt", names)
             self.assertIn("MANIFEST.json", names)
             for path in original:
-                self.assertIn("rollback/" + path, names)
+                self.assertIn("baseline/" + path, names)
                 self.assertIn("proposed/" + path, names)
                 self.assertEqual(
-                    package.read("rollback/" + path), original[path].encode()
+                    package.read("baseline/" + path), original[path].encode()
                 )
                 self.assertEqual(
                     package.read("proposed/" + path), proposal[path].encode()
                 )
+            self.assertIn("GENERATION_MANIFEST_PREVIEW.json", names)
+            canonical = package.read("GENERATION_MANIFEST_PREVIEW.json")
+            self.assertEqual(
+                json.loads(canonical)["format"], "omote-config-generation-v1"
+            )
             self.assertEqual(package.testzip(), None)
             manifest = json.loads(package.read("MANIFEST.json"))
             self.assertEqual(manifest["format"], release.BUNDLE_VERSION)
@@ -89,12 +94,39 @@ class TestReleaseArchive(unittest.TestCase):
             self.assertEqual(manifest["entry_id"], "test-entry-id")
             self.assertEqual(manifest["review_status"], "offline_unverified")
             self.assertFalse(manifest["deployable_by_current_integration"])
+            self.assertFalse(manifest["automatic_rollback_supported"])
+            self.assertTrue(manifest["canonical_manifest_included"])
             self.assertEqual(
                 manifest["draft_sha256"], model.file_digest(proposal)
             )
-            self.assertEqual(manifest["rollback_file_count"], 4)
-            self.assertIn("not safe for automated flashing",
+            self.assertEqual(manifest["baseline_file_count"], 4)
+            self.assertIn("not an installer",
                           package.read("READ_ME_FIRST.txt").decode().lower())
+
+    def test_image_asset_blocks_canonical_manifest_but_allows_review_zip(self):
+        original = fixture()
+        proposal = edited_files(original)
+        page = model.parse_jsonc(proposal["Pages/TV.json"])
+        page["Widgets"].append({
+            "Type": "Image", "FileName": "Images/wallpaper.png"
+        })
+        proposal["Pages/TV.json"] = model.dump_json(page)
+        report = review.make_review(proposal, original)
+        self.assertEqual(report["errors"], 0)
+        self.assertGreater(report["warnings"], 0)
+        raw = release.build_deployment_kit(
+            proposal, original, report, remote_id="remote-id"
+        )
+        with zipfile.ZipFile(BytesIO(raw)) as archive:
+            names = set(archive.namelist())
+            self.assertNotIn("GENERATION_MANIFEST_PREVIEW.json", names)
+            contents = json.loads(archive.read("MANIFEST.json"))
+            self.assertFalse(contents["canonical_manifest_included"])
+            self.assertEqual(
+                contents["referenced_assets_not_included"],
+                ["Images/wallpaper.png"]
+            )
+            self.assertFalse(contents["deployable_by_current_integration"])
 
     def test_verified_archive_tag_only_after_read_only_remote_check(self):
         original = fixture()

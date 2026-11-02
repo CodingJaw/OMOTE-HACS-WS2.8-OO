@@ -110,6 +110,28 @@ class TestSceneEditing(unittest.TestCase):
         self.assertEqual(result["pages"][0]["button_maps"]["VolUp"]["Repeat"], "UP")
         self.assertFalse(result["pages"][0]["widgets"][2]["editable_command"])
 
+    def test_shared_page_lists_other_scenes_and_keeps_local_labels(self):
+        files = fixture()
+        heating = model.parse_jsonc(files["Scenes/Heating.json"])
+        heating["Pages"].append({
+            "PageName": "TV in heating scene",
+            "ShortName": "TV",
+            "FileName": "Pages/TV.json"
+        })
+        files["Scenes/Heating.json"] = model.dump_json(heating)
+        tv = editor.scene_detail(files, "Scenes/WatchTV.json")
+        self.assertEqual(
+            tv["pages"][0]["shared_with_scenes"],
+            [{"scene_name": "Heating", "scene_path": "Scenes/Heating.json"}]
+        )
+        other = editor.scene_detail(files, "Scenes/Heating.json")
+        self.assertEqual(
+            other["pages"][2]["shared_with_scenes"],
+            [{"scene_name": "Watch TV", "scene_path": "Scenes/WatchTV.json"}]
+        )
+        self.assertEqual(tv["pages"][0]["name"], "Main TV")
+        self.assertEqual(other["pages"][2]["name"], "TV in heating scene")
+
     def test_prefix_command_options(self):
         detail = editor.scene_detail(fixture(), "Scenes/Heating.json")
         self.assertEqual(detail["pages"][0]["command_options"], ["BOOST","UP"])

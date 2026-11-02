@@ -251,7 +251,26 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
     elif not isinstance(scenes_index.get("Scenes"), list):
         issues.append(_issue("error", "Scenes.json", "Expected Scenes array"))
     else:
+        seen_scene_names: set[str] = set()
+        seen_scene_paths: set[str] = set()
         for item in scenes_index["Scenes"]:
+            if isinstance(item, dict):
+                path_ref = item.get("FileName")
+                scene_name = item.get("SceneName")
+                if isinstance(path_ref, str):
+                    if path_ref in seen_scene_paths:
+                        issues.append(_issue(
+                            "error", "Scenes.json",
+                            f"Duplicate scene file reference: {path_ref}"
+                        ))
+                    seen_scene_paths.add(path_ref)
+                if isinstance(scene_name, str) and scene_name:
+                    if scene_name in seen_scene_names:
+                        issues.append(_issue(
+                            "error", "Scenes.json",
+                            f"Duplicate scene name: {scene_name}"
+                        ))
+                    seen_scene_names.add(scene_name)
             if not isinstance(item, dict):
                 issues.append(_issue("error", "Scenes.json", "Scene entry must be an object"))
                 continue
@@ -317,6 +336,47 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
                 filename = reference(path, command.get("CommandFile"), "Commands/")
                 if filename:
                     ensure_command(path, filename, command.get("Command"))
+
+    # Firmware's current Config v2 graph validator recognizes these widget
+    # classes. Keep the draft policy explicit rather than silently accepting
+    # a widget that the selected Waveshare build cannot instantiate.
+    supported_widgets = frozenset({
+        "Title", "Label", "Button", "Image", "ColorButtons",
+        "NumberPad", "HaToggle", "HaLabel", "HaSwitch",
+        "HaSlider", "HaMomentary", "HaClimate",
+    })
+    for page_path, page_doc in parsed.items():
+        if not page_path.startswith("Pages/"):
+            continue
+        widgets = page_doc.get("Widgets", [])
+        if not isinstance(widgets, list):
+            issues.append(_issue("error", page_path, "Widgets must be an array"))
+            continue
+        for index, widget in enumerate(widgets):
+            if not isinstance(widget, dict):
+                issues.append(_issue(
+                    "error", page_path, f"Widgets[{index}] must be an object"
+                ))
+                continue
+            kind = widget.get("Type")
+            if not isinstance(kind, str) or kind not in supported_widgets:
+                issues.append(_issue(
+                    "error", page_path,
+                    f"Widgets[{index}] unsupported firmware widget Type: {kind!r}"
+                ))
+                continue
+            if kind == "Image":
+                image_path = widget.get("FileName")
+                # Some legacy UI themes use Type=Image without FileName,
+                # substituting an internal resource at render time. Do not
+                # reject otherwise valid drafts solely for that legacy shape.
+                # The canonical single-active package preview independently
+                # blocks such assets until an image-source contract exists.
+                if isinstance(image_path, str) and image_path.startswith("Images/"):
+                    issues.append(_issue(
+                        "warning", page_path,
+                        f"Image asset {image_path} is not included in JSON-only drafts"
+                    ))
 
     # Directly included pages not necessarily referenced by an indexed scene.
     for path, doc in parsed.items():

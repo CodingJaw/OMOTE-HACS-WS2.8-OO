@@ -20,7 +20,7 @@ class VisualLayoutEditor {
   build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/layout-editor.css?v=0.1.0-dev14";
+    stylesheet.href = "/omote_manager_static/layout-editor.css?v=0.1.0-dev16";
     this.studio.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "layout-editor";
@@ -347,6 +347,7 @@ class VisualLayoutEditor {
   async save() {
     const widget = this.widget;
     if (!widget || !widget.layout?.supported || !this.editor.entryId) return;
+    if (!this.editor.confirmSharedPageEdit()) return;
     const settings = this.currentSettings();
     const success = await this.editor.change({
       type: "omote_manager/editor/edit-layout",

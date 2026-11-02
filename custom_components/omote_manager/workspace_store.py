@@ -61,6 +61,7 @@ def _initial() -> dict[str, Any]:
         "locations": [],
         "templates": [],
         "drafts": {},
+        "reviewed": {},
     }
 
 
@@ -96,6 +97,10 @@ class WorkspaceStore:
         if state is not None:
             if not isinstance(state, dict) or state.get("schema_version") != 1:
                 raise WorkspaceError("Unsupported OMOTE workspace storage version")
+            # Version 1 workspaces predate locally retained reviewed snapshots.
+            state.setdefault("reviewed", {})
+            if not isinstance(state["reviewed"], dict):
+                raise WorkspaceError("Invalid reviewed configuration storage")
             self._state = state
 
     def _read(self) -> dict[str, Any]:
@@ -120,6 +125,18 @@ class WorkspaceStore:
             "drafts": {
                 entry_id: _draft_summary(entry_id, draft)
                 for entry_id, draft in state["drafts"].items()
+            },
+            "reviewed": {
+                entry_id: {
+                    "reviewed_at": item["reviewed_at"],
+                    "sha256": item["sha256"],
+                    "file_count": len(item["files"]),
+                    "bytes": sum(len(value.encode("utf-8"))
+                                 for value in item["files"].values()),
+                    "verification": item["verification"],
+                    "assets_included": False,
+                }
+                for entry_id, item in state.get("reviewed", {}).items()
             },
             "deployment_enabled": False,
         }
@@ -172,6 +189,72 @@ class WorkspaceStore:
                 "base_files": dict(copied),
                 "files": dict(copied),
                 "original_sha256": file_digest(copied),
+            }
+        await self._mutate(expected_revision, operation)
+
+    async def async_retain_reviewed(
+        self, expected_revision: int, entry_id: str,
+        expected_draft_sha256: str,
+    ) -> None:
+        """Retain one explicitly user-reviewed, locally valid HA configuration.
+
+        Unlike three-point backup history, this independent per-device snapshot
+        is NOT silently replaced by import, editing, or device reconnect.
+        Verification here is local validation, NOT live-firmware agreement.
+        """
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Import a draft before retaining a review")
+            files = draft["files"]
+            check_bundle_limits(files)
+            actual = file_digest(files)
+            if actual != expected_draft_sha256:
+                raise WorkspaceError("Draft SHA-256 changed; rerun review first")
+            errors = [issue for issue in validate_bundle(files)
+                      if issue["level"] == "error"]
+            if errors:
+                raise WorkspaceError(
+                    f"Cannot retain a configuration with {len(errors)} validation errors"
+                )
+            reviewed = state.setdefault("reviewed", {})
+            if entry_id not in reviewed and len(reviewed) >= MAX_DRAFTS:
+                raise WorkspaceError("Too many retained remote configurations")
+            reviewed[entry_id] = {
+                "reviewed_at": _now(),
+                "sha256": actual,
+                "files": dict(files),
+                "baseline_sha256": file_digest(draft["base_files"]),
+                "verification": "local_validation_only",
+            }
+        await self._mutate(expected_revision, operation)
+
+    async def async_load_reviewed(
+        self, expected_revision: int, entry_id: str, reviewed_sha256: str,
+        *, replace: bool = False,
+    ) -> None:
+        """Copy retained bytes to a new HA draft; never write to firmware."""
+        def operation(state):
+            reviewed = state.get("reviewed", {}).get(entry_id)
+            if reviewed is None:
+                raise WorkspaceError("No reviewed configuration for this remote")
+            files = reviewed["files"]
+            check_bundle_limits(files)
+            expected = reviewed.get("sha256")
+            if expected != reviewed_sha256 or file_digest(files) != expected:
+                raise WorkspaceError("Reviewed snapshot changed or failed SHA-256")
+            if any(issue["level"] == "error" for issue in validate_bundle(files)):
+                raise WorkspaceError("Reviewed snapshot failed validation")
+            drafts = state["drafts"]
+            if entry_id in drafts and not replace:
+                raise WorkspaceError("A draft exists; explicitly confirm replacement")
+            if entry_id not in drafts and len(drafts) >= MAX_DRAFTS:
+                raise WorkspaceError("Too many remote drafts")
+            drafts[entry_id] = {
+                "imported_at": _now(),
+                "base_files": dict(files),
+                "files": dict(files),
+                "original_sha256": expected,
             }
         await self._mutate(expected_revision, operation)
 

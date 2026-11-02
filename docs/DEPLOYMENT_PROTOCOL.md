@@ -1,4 +1,15 @@
-# OMOTE safe deployment protocol — proposed firmware change
+# Historical OMOTE A/B deployment proposal — SUPERSEDED
+
+**This document is historical and is NOT the current implementation contract.**
+On November 1, 2026 the user cancelled managed A/B generations,
+previous-revision rollback and automatic rollback. The authoritative design is
+[firmware CONFIG_V2_SINGLE_ACTIVE_DESIGN.md](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/blob/feature/config-v2-transactional/docs/CONFIG_V2_SINGLE_ACTIVE_DESIGN.md);
+see also [this HACS branch's current integration plan](SINGLE_ACTIVE_HACS.md).
+Never implement any A/B or /rollback endpoint based on the text below.
+All network firmware writes remain disabled until the authenticated
+single-active transaction contract is frozen and tested.
+
+## Archived proposal (superseded)
 
 **Firmware tracking issue:** [CodingJaw/OMOTE-Firmware-WS2.8-OO #1](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
 

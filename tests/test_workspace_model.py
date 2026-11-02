@@ -98,6 +98,31 @@ class TestJsonModel(unittest.TestCase):
     def test_complete_bundle_validates(self):
         self.assertEqual(model.validate_bundle(sample_bundle()), [])
 
+    def test_duplicate_scene_entry_rejected(self):
+        files = sample_bundle()
+        index = model.parse_jsonc(files["Scenes.json"])
+        index["Scenes"].append(dict(index["Scenes"][0]))
+        files["Scenes.json"] = model.dump_json(index)
+        msgs = [issue["message"] for issue in model.validate_bundle(files)]
+        self.assertTrue(any("Duplicate scene file" in msg for msg in msgs))
+        self.assertTrue(any("Duplicate scene name" in msg for msg in msgs))
+
+    def test_unsupported_widgets_error_and_unbundled_image_warning(self):
+        files = sample_bundle()
+        page = model.parse_jsonc(files["Pages/TV.json"])
+        page["Widgets"].append({"Type": "UnknownRemoteWidget"})
+        files["Pages/TV.json"] = model.dump_json(page)
+        self.assertTrue(any(
+            issue["level"] == "error" and "unsupported firmware widget" in issue["message"]
+            for issue in model.validate_bundle(files)
+        ))
+        page["Widgets"][-1] = {"Type": "Image", "FileName": "Images/Wall.png"}
+        files["Pages/TV.json"] = model.dump_json(page)
+        self.assertTrue(any(
+            issue["level"] == "warning" and "not included" in issue["message"]
+            for issue in model.validate_bundle(files)
+        ))
+
     def test_invalid_widget_structure_reports_error_instead_of_crashing(self):
         files = sample_bundle()
         page = model.parse_jsonc(files["Pages/TV.json"])
@@ -236,6 +261,82 @@ class TestWorkspaceStorage(unittest.IsolatedAsyncioTestCase):
             model.parse_jsonc(source["Commands/TV.json"])["Commands"][1]["Data"][1], "on"
         )
         self.assertEqual(workspace.validation("remote_a")["errors"], 0)
+
+
+class TestReviewedRetention(unittest.IsolatedAsyncioTestCase):
+    async def test_retained_config_independent_of_draft_and_survives_reload(self):
+        hass = {}
+        ws = store.WorkspaceStore(hass)
+        await ws.async_load()
+        original = sample_bundle()
+        await ws.async_import(0, "remote_a", original)
+        digest = model.file_digest(original)
+        await ws.async_retain_reviewed(1, "remote_a", digest)
+        self.assertEqual(ws.summary()["revision"], 2)
+        self.assertEqual(ws.summary()["reviewed"]["remote_a"]["sha256"], digest)
+        self.assertFalse(ws.summary()["deployment_enabled"])
+        await ws.async_edit_command(
+            2, "remote_a", "Commands/TV.json",
+            "PWR_ON", "MQTT", "PUB", ["another/topic", "off"]
+        )
+        self.assertNotEqual(
+            ws.summary()["drafts"]["remote_a"]["current_sha256"], digest
+        )
+        self.assertEqual(ws.summary()["reviewed"]["remote_a"]["sha256"], digest)
+        after_restart = store.WorkspaceStore(hass)
+        await after_restart.async_load()
+        self.assertEqual(after_restart.summary()["reviewed"]["remote_a"]["sha256"], digest)
+        with self.assertRaisesRegex(model.WorkspaceError, "explicitly confirm"):
+            await after_restart.async_load_reviewed(3, "remote_a", digest)
+        await after_restart.async_load_reviewed(3, "remote_a", digest, replace=True)
+        self.assertEqual(
+            after_restart.summary()["drafts"]["remote_a"]["current_sha256"], digest
+        )
+        self.assertEqual(after_restart.summary()["revision"], 4)
+        self.assertNotIn("files", after_restart.summary()["reviewed"]["remote_a"])
+
+    async def test_reviewed_save_requires_draft_digest_and_valid_graph(self):
+        ws = store.WorkspaceStore({})
+        await ws.async_load()
+        files = sample_bundle()
+        await ws.async_import(0, "remote_a", files)
+        with self.assertRaisesRegex(model.WorkspaceError, "Draft SHA-256"):
+            await ws.async_retain_reviewed(1, "remote_a", "0" * 64)
+        self.assertEqual(ws.summary()["revision"], 1)
+        invalid = dict(files)
+        invalid.pop("Pages/TV.json")
+        # Directly exercising mutation is intentional: editing methods normally
+        # guard this; review must reject a structurally invalid draft regardless.
+        ws._state["drafts"]["remote_a"]["files"] = invalid
+        with self.assertRaisesRegex(model.WorkspaceError, "validation errors"):
+            await ws.async_retain_reviewed(1, "remote_a", model.file_digest(invalid))
+        self.assertNotIn("remote_a", ws.summary()["reviewed"])
+
+    async def test_reviewed_hash_tampering_rejected_before_draft_replacement(self):
+        ws = store.WorkspaceStore({})
+        await ws.async_load()
+        files = sample_bundle()
+        await ws.async_import(0, "remote_a", files)
+        sha = model.file_digest(files)
+        await ws.async_retain_reviewed(1, "remote_a", sha)
+        ws._state["reviewed"]["remote_a"]["files"]["Scenes.json"] += " "
+        before = ws.summary()["drafts"]["remote_a"]["current_sha256"]
+        with self.assertRaisesRegex(model.WorkspaceError, "failed SHA-256"):
+            await ws.async_load_reviewed(2, "remote_a", sha, replace=True)
+        self.assertEqual(ws.summary()["revision"], 2)
+        self.assertEqual(ws.summary()["drafts"]["remote_a"]["current_sha256"], before)
+
+    async def test_legacy_workspace_upgrade_defaults_reviewed(self):
+        hass = {
+            "omote_manager.workspace": {
+                "schema_version": 1, "revision": 3,
+                "locations": [], "templates": [], "drafts": {}
+            }
+        }
+        ws = store.WorkspaceStore(hass)
+        await ws.async_load()
+        self.assertEqual(ws.summary()["reviewed"], {})
+        self.assertEqual(ws.summary()["revision"], 3)
 
 
 if __name__ == "__main__":

@@ -21,9 +21,9 @@ from .safe_files import is_exportable_json
 from .workspace_ws import register_workspace_websockets
 
 PANEL_PATH = "omote-manager"
-PANEL_ELEMENT = "omote-manager-panel-v14"
+PANEL_ELEMENT = "omote-manager-panel-v16"
 STATIC_PATH = "/omote_manager_static"
-ASSET_VERSION = "0.1.0-dev14"
+ASSET_VERSION = "0.1.0-dev16"
 
 
 async def async_register_manager_panel(hass: HomeAssistant) -> None:
@@ -172,15 +172,15 @@ async def websocket_capabilities(
             "Could not inspect firmware capability metadata",
         )
         return
-    # Storage diagnostics are available only on the experimental preview.
-    # A missing/invalid status must never be mistaken for a healthy selector.
-    if info.get("preview_only"):
+    # Probe all v2 versions read-only. Old preview placeholders are ignored.
+    # A malformed response never enables deployment or recovery actions.
+    if info.get("generation") != "legacy-v1":
         try:
             info["storage_status"] = await coordinator.api.storage_status()
         except OmoteApiError:
             info["storage_status"] = {
                 "available": False,
-                "error": "Storage diagnostic endpoint unavailable",
+                "error": "Storage diagnostic endpoint unavailable or invalid",
             }
     # A remote's self-advertisement must never grant write authorization.
     info["deployment_enabled"] = False
