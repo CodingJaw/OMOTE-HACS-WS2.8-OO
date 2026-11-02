@@ -97,7 +97,7 @@ def _command_names(files: dict[str, str], page: dict, prefix: str) -> list[str]:
 
 def scene_detail(files: dict[str, str], scene_path: str) -> dict[str, Any]:
     """Return a bounded editor view with page/widget/key assignments."""
-    _, entry, scene = _scene(files, scene_path)
+    scene_index, entry, scene = _scene(files, scene_path)
     pages = scene.get("Pages", [])
     if not isinstance(pages, list):
         raise WorkspaceError("Invalid scene Pages array")
@@ -130,7 +130,30 @@ def scene_detail(files: dict[str, str], scene_path: str) -> dict[str, Any]:
                                     and isinstance(widget.get("Command"), (str, list)),
                 "layout": layout_description(widget),
             })
+        # A page JSON file may be referenced by several scenes. Show exactly
+        # which other scenes would be affected by edits to this shared file.
+        shared_with = []
+        for other in scene_index.get("Scenes", [])[:100]:
+            if not isinstance(other, dict):
+                continue
+            other_file = other.get("FileName")
+            if not isinstance(other_file, str) or other_file == scene_path:
+                continue
+            try:
+                other_doc = parse_jsonc(files.get(other_file, ""))
+            except WorkspaceError:
+                continue
+            if not isinstance(other_doc, dict):
+                continue
+            other_pages = other_doc.get("Pages", [])
+            if isinstance(other_pages, list) and any(
+                isinstance(other_page, dict) and other_page.get("FileName") == path
+                for other_page in other_pages
+            ):
+                shared_with.append(str(other.get("SceneName", other_file))[:80])
         result.append({
+            "shared_scene_count": len(shared_with),
+            "shared_with_scenes": shared_with,
             "index": ix,
             "name": item.get("PageName", path),
             "short_name": item.get("ShortName", ""),

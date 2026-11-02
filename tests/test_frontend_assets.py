@@ -112,6 +112,9 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("single-active", panel_js)
         self.assertNotIn("Generation activation: DISABLED", panel_js)
         self.assertIn("recovery_required", panel_js)
+        self.assertIn("se-shared-page", diff_view)
+        self.assertIn("shared_scene_count", diff_view)
+        self.assertIn("shared_with_scenes", (ROOT / "editor_model.py").read_text())
 
 
 

@@ -110,6 +110,20 @@ class TestSceneEditing(unittest.TestCase):
         self.assertEqual(result["pages"][0]["button_maps"]["VolUp"]["Repeat"], "UP")
         self.assertFalse(result["pages"][0]["widgets"][2]["editable_command"])
 
+    def test_shared_page_impact_lists_other_scenes(self):
+        files = fixture()
+        other = model.parse_jsonc(files["Scenes/Heating.json"])
+        other["Pages"].append({
+            "PageName": "Shared TV controls", "FileName": "Pages/TV.json"
+        })
+        files["Scenes/Heating.json"] = model.dump_json(other)
+        detail = editor.scene_detail(files, "Scenes/WatchTV.json")
+        page = detail["pages"][0]
+        self.assertEqual(page["shared_scene_count"], 1)
+        self.assertEqual(page["shared_with_scenes"], ["Heating"])
+        other_detail = editor.scene_detail(files, "Scenes/Heating.json")
+        self.assertEqual(other_detail["pages"][2]["shared_with_scenes"], ["Watch TV"])
+
     def test_prefix_command_options(self):
         detail = editor.scene_detail(fixture(), "Scenes/Heating.json")
         self.assertEqual(detail["pages"][0]["command_options"], ["BOOST","UP"])

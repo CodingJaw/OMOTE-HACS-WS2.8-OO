@@ -43,6 +43,7 @@ class SceneEditor {
       '<div class="se-pickers"><label>Scene<select id="se-scene"></select></label>',
       '<label>Page<select id="se-page"></select></label></div>',
       '<p id="se-path" class="muted"></p>',
+      '<p id="se-shared-page" class="se-review-warning" role="status"></p>',
       '<div class="se-grid">',
       '<form id="se-scene-form"><h4>Scene metadata</h4>',
       '<label>Menu name<input name="name" maxlength="80" required></label>',
@@ -329,9 +330,15 @@ class SceneEditor {
       this.enable(id, Boolean(page));
     }
     if (!page) {
+      this.ui("se-shared-page").textContent = "";
       if (this.layoutEditor) this.layoutEditor.render();
       return;
     }
+    this.ui("se-shared-page").textContent = page.shared_scene_count
+      ? "SHARED PAGE: Changes to widgets, physical key mappings or layout " +
+        "will also affect " + page.shared_scene_count + " other scene(s): " +
+        (page.shared_with_scenes || []).join(", ")
+      : "This page is not shared with another indexed scene.";
     const form = this.ui("se-page-form");
     form.elements.name.value = page.name;
     form.elements.short_name.value = page.short_name;
@@ -397,6 +404,15 @@ class SceneEditor {
 
   async change(message, messageOnSuccess) {
     if (!this.draft || this.busy) return false;
+    if (["omote_manager/editor/edit-widget", "omote_manager/editor/edit-button",
+         "omote_manager/editor/edit-layout"].includes(message.type) &&
+        this.page?.shared_scene_count > 0 &&
+        !window.confirm("This page is also used by " +
+          this.page.shared_scene_count + " other scene(s): " +
+          this.page.shared_with_scenes.join(", ") +
+          ". This draft edit will affect all of them. Continue?")) {
+      return false;
+    }
     this.busy = true;
     const good = await this.studio.change({
       ...message, entry_id: this.entryId
