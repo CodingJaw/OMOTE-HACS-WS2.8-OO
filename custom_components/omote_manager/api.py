@@ -168,7 +168,8 @@ class OmoteApi:
         if data.get("path") != path or type(size) is not int or size < 0:
             raise OmoteApiError(f"Invalid size metadata for {path}")
         if size > max_bytes:
-            raise OmoteApiError(f"File {path} exceeds {max_bytes} byte limit ({size} bytes)")
+            label = "64 KiB" if max_bytes == MAX_BACKUP_FILE_BYTES else f"{max_bytes} byte"
+            raise OmoteApiError(f"File {path} exceeds {label} limit ({size} bytes)")
         return size
 
     @staticmethod
