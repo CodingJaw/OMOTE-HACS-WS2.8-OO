@@ -347,6 +347,7 @@ class VisualLayoutEditor {
   async save() {
     const widget = this.widget;
     if (!widget || !widget.layout?.supported || !this.editor.entryId) return;
+    if (!this.editor.confirmSharedPageEdit()) return;
     const settings = this.currentSettings();
     const success = await this.editor.change({
       type: "omote_manager/editor/edit-layout",

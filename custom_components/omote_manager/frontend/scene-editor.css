@@ -238,3 +238,15 @@
 .se-review-retention p { font-size: 11px; line-height: 1.5; margin: 5px 0 0; color: var(--secondary-text-color, #647487); }
 .se-review-retention button { padding: 10px 13px; border-radius: 7px; }
 .se-review-retention button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Cross-scene shared page edit impact warning. */
+.se-shared-impact-warning {
+  padding: 11px 13px;
+  border: 1px solid var(--warning-color, #ac7c21);
+  border-radius: 8px;
+  color: var(--primary-text-color, #252525);
+  background: var(--secondary-background-color, #faf9f2);
+  line-height: 1.5;
+  font-size: 12px;
+  font-weight: 600;
+}

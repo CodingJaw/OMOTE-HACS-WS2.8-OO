@@ -44,6 +44,7 @@ class SceneEditor {
       '<div class="se-pickers"><label>Scene<select id="se-scene"></select></label>',
       '<label>Page<select id="se-page"></select></label></div>',
       '<p id="se-path" class="muted"></p>',
+      '<p id="se-shared-impact" class="muted" role="status" aria-live="polite"></p>',
       '<div class="se-grid">',
       '<form id="se-scene-form"><h4>Scene metadata</h4>',
       '<label>Menu name<input name="name" maxlength="80" required></label>',
@@ -295,6 +296,7 @@ class SceneEditor {
       this.enable(id, Boolean(page));
     }
     if (!page) {
+      this.ui("se-shared-impact").textContent = "";
       if (this.layoutEditor) this.layoutEditor.render();
       return;
     }
@@ -304,6 +306,15 @@ class SceneEditor {
     this.ui("se-path").textContent =
       this.scenePath + " → " + page.path + " → " + page.command_file +
       (page.command_prefix ? " (prefix " + page.command_prefix + ")" : "");
+    const shared = page.shared_with_scenes || [];
+    this.ui("se-shared-impact").textContent = shared.length
+      ? "SHARED PAGE WARNING: " + page.path + " is also used by " +
+        shared.map(item => item.scene_name).join(", ") +
+        ". Widget, layout and physical button edits here affect ALL of those scenes. " +
+        "Scene tab labels are not shared."
+      : "This page has no other scene users in the current imported draft.";
+    this.ui("se-shared-impact").className =
+      shared.length ? "se-shared-impact-warning" : "muted";
     const widgetForm = this.ui("se-widget-form");
     const widgets = page.widgets.filter(w => w.editable_text || w.editable_command);
     this.select(widgetForm.elements.widget, widgets.map(w => [
@@ -398,8 +409,19 @@ class SceneEditor {
     }, "Page labels saved to draft.")) this.note("Page labels saved.");
   }
 
+  confirmSharedPageEdit() {
+    const shared = this.page?.shared_with_scenes || [];
+    if (!shared.length) return true;
+    return window.confirm(
+      "This page JSON is shared with " +
+      shared.map(item => item.scene_name).join(", ") +
+      ". Any widget, layout or button mapping change will affect ALL scenes " +
+      "using this page in the Home Assistant draft. Continue?"
+    );
+  }
+
   async saveWidget() {
-    if (!this.page) return;
+    if (!this.page || !this.confirmSharedPageEdit()) return;
     const f = this.ui("se-widget-form").elements;
     const field = f.field.value;
     if (await this.change({
@@ -412,7 +434,7 @@ class SceneEditor {
   }
 
   async saveKey() {
-    if (!this.page) return;
+    if (!this.page || !this.confirmSharedPageEdit()) return;
     const f = this.ui("se-key-form").elements;
     if (await this.change({
       type: "omote_manager/editor/edit-button",

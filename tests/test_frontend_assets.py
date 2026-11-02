@@ -111,6 +111,8 @@ class TestFrontendVersionContract(unittest.TestCase):
                       (ROOT / "reviewed_ws.py").read_text())
         self.assertIn("studio-reviewed-load", (FRONTEND / "workspace-panel.js").read_text())
         self.assertIn("se-retain-reviewed", (FRONTEND / "scene-editor.js").read_text())
+        self.assertIn("se-shared-impact", (FRONTEND / "scene-editor.js").read_text())
+        self.assertIn("confirmSharedPageEdit", (FRONTEND / "layout-editor.js").read_text())
         self.assertIn("omote-config-generation-v1",
                       (ROOT / "single_active_manifest.py").read_text())
 

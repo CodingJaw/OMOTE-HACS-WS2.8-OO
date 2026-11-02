@@ -46,3 +46,12 @@ The server-side deploy permission remains hard-disabled. No mDNS TXT field,
 capability flag, preview build label or merely valid ZIP can enable it. The
 upcoming HACS UI should offer manual recovery review only after a secure
 firmware contract, physical acceptance tests and explicit release approval.
+
+## Shared-page edit safety
+
+`editor_model.scene_detail` now returns `shared_with_scenes` per page:
+a bounded, path/name-only list of other scenes that reuse that page JSON.
+Scene tab labels remain scene-local. Profile Studio displays a warning
+and requires confirmation before changing widget text, command mappings,
+physical button assignments, or visual widget positions on a shared page.
+These are local HA draft edits only; no physical remote commands are sent.

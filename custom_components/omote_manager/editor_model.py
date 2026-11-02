@@ -97,7 +97,35 @@ def _command_names(files: dict[str, str], page: dict, prefix: str) -> list[str]:
 
 def scene_detail(files: dict[str, str], scene_path: str) -> dict[str, Any]:
     """Return a bounded editor view with page/widget/key assignments."""
-    _, entry, scene = _scene(files, scene_path)
+    index, entry, scene = _scene(files, scene_path)
+    # Show which other scenes use a shared page before someone saves widget
+    # captions, layouts or button maps. Page/tab labels are scene-local.
+    usage: dict[str, list[dict[str, str]]] = {}
+    for scene_entry in index.get("Scenes", []):
+        if not isinstance(scene_entry, dict):
+            continue
+        other_path = scene_entry.get("FileName")
+        if not isinstance(other_path, str) or other_path not in files:
+            continue
+        try:
+            other = _document(files, other_path)
+        except WorkspaceError:
+            continue
+        other_pages = other.get("Pages", [])
+        if not isinstance(other_pages, list):
+            continue
+        for page_ref in other_pages:
+            if not isinstance(page_ref, dict):
+                continue
+            page_path = page_ref.get("FileName")
+            if isinstance(page_path, str) and page_path.startswith("Pages/"):
+                scene_ref = {
+                    "scene_path": other_path,
+                    "scene_name": str(scene_entry.get("SceneName") or other_path)[:80],
+                }
+                users = usage.setdefault(page_path, [])
+                if not any(item["scene_path"] == other_path for item in users):
+                    users.append(scene_ref)
     pages = scene.get("Pages", [])
     if not isinstance(pages, list):
         raise WorkspaceError("Invalid scene Pages array")
@@ -135,6 +163,11 @@ def scene_detail(files: dict[str, str], scene_path: str) -> dict[str, Any]:
             "name": item.get("PageName", path),
             "short_name": item.get("ShortName", ""),
             "path": path,
+            "shared_with_scenes": sorted(
+                (other for other in usage.get(path, [])
+                 if other["scene_path"] != scene_path),
+                key=lambda other: other["scene_name"]
+            ),
             "command_prefix": prefix,
             "command_file": page.get("CommandFile", ""),
             "command_options": _command_names(files, page, prefix),
