@@ -103,6 +103,31 @@ class TestReleaseArchive(unittest.TestCase):
             self.assertIn("not an installer",
                           package.read("READ_ME_FIRST.txt").decode().lower())
 
+    def test_image_asset_blocks_canonical_manifest_but_allows_review_zip(self):
+        original = fixture()
+        proposal = edited_files(original)
+        page = model.parse_jsonc(proposal["Pages/TV.json"])
+        page["Widgets"].append({
+            "Type": "Image", "FileName": "Images/wallpaper.png"
+        })
+        proposal["Pages/TV.json"] = model.dump_json(page)
+        report = review.make_review(proposal, original)
+        self.assertEqual(report["errors"], 0)
+        self.assertGreater(report["warnings"], 0)
+        raw = release.build_deployment_kit(
+            proposal, original, report, remote_id="remote-id"
+        )
+        with zipfile.ZipFile(BytesIO(raw)) as archive:
+            names = set(archive.namelist())
+            self.assertNotIn("GENERATION_MANIFEST_PREVIEW.json", names)
+            contents = json.loads(archive.read("MANIFEST.json"))
+            self.assertFalse(contents["canonical_manifest_included"])
+            self.assertEqual(
+                contents["referenced_assets_not_included"],
+                ["Images/wallpaper.png"]
+            )
+            self.assertFalse(contents["deployable_by_current_integration"])
+
     def test_verified_archive_tag_only_after_read_only_remote_check(self):
         original = fixture()
         proposal = edited_files(original)
