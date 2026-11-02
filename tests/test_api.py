@@ -154,6 +154,42 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(client.OmoteApiError):
             await self.api.read_file("Commands/Test.json", verify_json=True)
 
+    async def test_binary_png_larger_than_json_limit(self):
+        image = b"\\x89PNG\\r\\n\\x1a\\n" + b"X" * (72 * 1024)
+        self.source = image
+        result = await self.api.read_image_asset("Images/living-room.png")
+        self.assertEqual(result, image)
+        self.assertEqual(self.chunk_calls, 0)
+
+    async def test_binary_jpeg_retrieval_via_chunks(self):
+        image = b"\\xff\\xd8\\xff" + b"X" * 7000
+        self.source = image
+        self.raw_mode = "partial"
+        result = await self.api.read_image_asset("Images/living-room.jpeg")
+        self.assertEqual(result, image)
+        self.assertGreater(self.chunk_calls, 0)
+
+    async def test_invalid_image_signature_rejected(self):
+        self.source = b"not a valid png"
+        with self.assertRaisesRegex(client.OmoteApiError, "signature"):
+            await self.api.read_image_asset("Images/fake.png")
+
+    async def test_image_path_and_quota_rejected(self):
+        for path in ("../Images/secret.png", "Images/../secret.png",
+                     "DeviceSettings.json", "Images/evil.svg"):
+            with self.subTest(path=path), self.assertRaises(client.OmoteApiError):
+                await self.api.read_image_asset(path)
+        self.source = b"\\x89PNG\\r\\n\\x1a\\n" + b"X" * (512 * 1024)
+        with self.assertRaisesRegex(client.OmoteApiError, "exceeds"):
+            await self.api.read_image_asset("Images/huge.png")
+
+    async def test_short_image_transfer_rejected(self):
+        self.source = b"\\x89PNG\\r\\n\\x1a\\n" + b"X" * 3000
+        self.raw_mode = "partial"
+        self.chunk_mode = "partial"
+        with self.assertRaises(client.OmoteApiError):
+            await self.api.read_image_asset("Images/room.png")
+
     async def test_fragments_consumed_to_eof(self):
         result = await self.api.read_file("Commands/Test.json", verify_json=True)
         self.assertEqual(result.encode("utf-8"), DOC)
