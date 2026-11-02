@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import json
+import re
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -24,6 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 _CHUNK_SIZE = 2048
 _READ_TIMEOUT = 35
 _MAX_JSON_RESPONSE_BYTES = 128 * 1024
+_MAX_BINARY_IMAGE_BYTES = 512 * 1024
+_PUBLIC_IMAGE_PATH = re.compile(r"Images/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.(?:png|jpg|jpeg)", re.I)
 
 
 class OmoteApiError(Exception):
@@ -157,15 +160,15 @@ class OmoteApi:
         ):
             raise OmoteApiError("Unsafe filesystem path")
 
-    async def file_size(self, path: str) -> int:
+    async def file_size(self, path: str, *, max_bytes: int = MAX_BACKUP_FILE_BYTES) -> int:
         """Read authoritative size from the firmware's file-stat API."""
         self._check_path(path)
         data = await self._json("/api/fs/stat", params={"path": path})
         size = data.get("size")
         if data.get("path") != path or type(size) is not int or size < 0:
             raise OmoteApiError(f"Invalid size metadata for {path}")
-        if size > MAX_BACKUP_FILE_BYTES:
-            raise OmoteApiError(f"File {path} exceeds 64 KiB limit ({size} bytes)")
+        if size > max_bytes:
+            raise OmoteApiError(f"File {path} exceeds {max_bytes} byte limit ({size} bytes)")
         return size
 
     @staticmethod
@@ -327,3 +330,38 @@ class OmoteApi:
             f"Unable to safely read {path}: raw read: {raw_error}; "
             f"chunked read: {chunk_error}"
         )
+
+    async def read_image_asset(self, path: str) -> bytes:
+        """Read one public PNG/JPEG using bounded binary transport.
+
+        No partial data is returned. The remote's legacy stat API supplies
+        only length, not an immutable snapshot or server-side SHA-256; callers
+        must not claim a proven point-in-time backup based on this alone.
+        """
+        self._check_path(path)
+        if not _PUBLIC_IMAGE_PATH.fullmatch(path) or any(
+            segment in (".", "..") for segment in path.split("/")
+        ):
+            raise OmoteApiError("Unsafe or unsupported image asset path")
+        length = await self.file_size(path, max_bytes=_MAX_BINARY_IMAGE_BYTES)
+        if length == 0:
+            raise OmoteApiError("Empty image asset")
+        try:
+            raw = await self._read_raw(path, length)
+            if len(raw) != length:
+                raise OmoteApiError("Short raw image transfer")
+        except OmoteApiError:
+            raw = await self._read_chunked(path, length)
+        if len(raw) != length:
+            raise OmoteApiError("Image transfer length mismatch")
+        if path.lower().endswith(".png"):
+            valid = raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        else:
+            valid = raw.startswith(b"\\xff\\xd8\\xff")
+        if not valid:
+            raise OmoteApiError("Image signature mismatch")
+        # Detect ordinary size changes while reading. A same-length update
+        # cannot be detected by the current firmware API (no server digest).
+        if await self.file_size(path, max_bytes=_MAX_BINARY_IMAGE_BYTES) != length:
+            raise OmoteApiError("Image size changed during transfer")
+        return raw
