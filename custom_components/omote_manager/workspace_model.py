@@ -367,15 +367,12 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
                 continue
             if kind == "Image":
                 image_path = widget.get("FileName")
-                if not isinstance(image_path, str) or not (
-                    image_path.startswith("Images/") and
-                    image_path.endswith((".png", ".jpg", ".jpeg", ".bmp"))
-                ):
-                    issues.append(_issue(
-                        "error", page_path,
-                        f"Widgets[{index}] invalid Image FileName"
-                    ))
-                else:
+                # Some legacy UI themes use Type=Image without FileName,
+                # substituting an internal resource at render time. Do not
+                # reject otherwise valid drafts solely for that legacy shape.
+                # The canonical single-active package preview independently
+                # blocks such assets until an image-source contract exists.
+                if isinstance(image_path, str) and image_path.startswith("Images/"):
                     issues.append(_issue(
                         "warning", page_path,
                         f"Image asset {image_path} is not included in JSON-only drafts"

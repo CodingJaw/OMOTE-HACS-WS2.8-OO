@@ -91,7 +91,7 @@ class TestSingleActiveManifest(unittest.TestCase):
     def test_malformed_image_widget_not_treated_as_complete(self):
         files = fixture()
         files["Pages/TV.json"] = '{"Widgets":[{"Type":"Image"}]}'
-        with self.assertRaisesRegex(model.WorkspaceError, "validation errors"):
+        with self.assertRaisesRegex(model.WorkspaceError, "Image assets"):
             preview.build_canonical_json_manifest(files)
 
     def test_missing_page_and_secret_rejected(self):
