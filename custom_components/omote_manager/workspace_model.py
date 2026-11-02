@@ -251,11 +251,20 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
     elif not isinstance(scenes_index.get("Scenes"), list):
         issues.append(_issue("error", "Scenes.json", "Expected Scenes array"))
     else:
+        indexed_paths: set[str] = set()
         for item in scenes_index["Scenes"]:
             if not isinstance(item, dict):
                 issues.append(_issue("error", "Scenes.json", "Scene entry must be an object"))
                 continue
-            reference("Scenes.json", item.get("FileName"), "Scenes/")
+            scene_file = item.get("FileName")
+            if isinstance(scene_file, str):
+                if scene_file in indexed_paths:
+                    issues.append(_issue(
+                        "error", "Scenes.json",
+                        f"Duplicate scene file in index: {scene_file}"
+                    ))
+                indexed_paths.add(scene_file)
+            reference("Scenes.json", scene_file, "Scenes/")
 
     def ensure_command(path: str, filename: str, name: Any) -> None:
         if not isinstance(name, str) or not name:
@@ -320,8 +329,25 @@ def validate_bundle(files: dict[str, str]) -> list[dict[str, str]]:
 
     # Directly included pages not necessarily referenced by an indexed scene.
     for path, doc in parsed.items():
-        if path.startswith("Pages/") and "CommandFile" in doc:
+        if not path.startswith("Pages/"):
+            continue
+        if "CommandFile" in doc:
             reference(path, doc["CommandFile"], "Commands/")
+        widgets = doc.get("Widgets", [])
+        if isinstance(widgets, list) and any(
+            isinstance(widget, dict)
+            and (
+                str(widget.get("Type", "")).casefold() == "image"
+                or "ImagePath" in widget
+                or "ImageFile" in widget
+            )
+            for widget in widgets
+        ):
+            issues.append(_issue(
+                "warning", path,
+                "Image widget assets are not included in JSON-only HA snapshots; "
+                "the future secure deployment must verify their binary dependencies"
+            ))
     return issues
 
 

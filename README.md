@@ -2,7 +2,13 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev14 — Home Assistant draft editing; no firmware writes.**
+**Feature branch build 0.1.0-dev15 — NOT published to HACS main. No firmware writes.**
+
+This branch follows the user-approved **single-active configuration** design:
+no A/B generations, automatic rollback, or rollback endpoint. HACS keeps a
+reviewed copy plus separate backup history; recovery resend will be manual and
+require HA admin and new touchscreen approval. Existing HACS `main` remains
+at dev14. See [single-active deployment handoff](docs/DEPLOYMENT_PROTOCOL.md).
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
@@ -15,6 +21,28 @@ A HACS custom integration for [OMOTE object-oriented firmware](https://github.co
 - OMOTE API **omote-config-v1**, on TCP 80 by default
 
 These are targets; live installation against the specified versions remains to be tested.
+
+## Feature-branch additions (not yet installed by HACS)
+
+- **Read-only single-active diagnostics:** mode `legacy`, `active` or
+  `recovery`, recovery reason, current active revision SHA-256, LittleFS
+  capacity. Deprecated A/B placeholders remain accepted on older preview
+  firmware, but are no longer shown as active features.
+- **Save reviewed copy in HA:** after a successful validation/drift review,
+  explicitly retain one complete JSON-only draft per remote. Metadata and
+  SHA-256 integrity are checked on load. The three-snapshot imported backup
+  history remains independent and is never overwritten by saving a review.
+- **Manual recovery check in Profile Studio:** read-only check for a device
+  recovery warning. No automatic upload, pairing or activation occurs.
+- **Offline ZIP v2:** proposed JSON, imported baseline, deterministic per-file
+  SHA-256 index. Binary images, device settings and credentials are excluded.
+  It is not a complete recovery image or firmware-ready deployment manifest.
+- **Additional validation:** duplicate scene index entries and image asset
+  dependency warnings. Validation never writes to the remote.
+
+**This branch is not merged or released.** Review it in
+[PR #3](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/pull/3).
+Current HACS installations on `main` continue to run dev14.
 
 ## Installation (available on default branch)
 
@@ -101,7 +129,7 @@ In **Profile Studio → Compare original and draft**, updated unified diffs use 
 
 A new **Deployment readiness review** underneath the comparison lists changed paths, per-file raw-byte SHA-256 hashes and sizes, structural validation counts and any blockers. With **Read changed files from Waveshare** enabled, the Home Assistant backend verifies the firmware API, reads only the draft's changed original files, and compares them to the imported baseline; a new draft file already present on the remote is reported as a conflict. If the device is offline, deselect the live check for a local-only review. This check is point-in-time and does not guarantee the files remain unchanged afterward.
 
-**Deployment remains disabled.** The firmware API does not yet provide authenticated transaction staging, commit verification and reliable rollback. The review never writes configuration files, does not change the device, and does not overwrite drafts. Draft edits invalidate an earlier review.
+**Deployment remains disabled.** The firmware API does not yet provide authenticated single-active transactions and independently tested recovery. The review never writes configuration files, does not change the device, and does not overwrite drafts. Draft edits invalidate an earlier review.
 
 ### Downloadable deployment and recovery kit (v0.1.0-dev10)
 
@@ -112,11 +140,11 @@ After editing a draft in **Profile Studio → Compare original and draft**:
 1. Click **Run review** to validate the files and (optionally) compare changed originals to the live Waveshare.
 2. If the draft has changes, zero validation errors, and no live conflicts, the **Download reviewed ZIP** button becomes available.
 3. Click to download `omote-deployment-review-kit.zip`. With a live review, the integration repeats the remote baseline check immediately before creating the archive. If the remote is offline, uncheck **Read changed files from Waveshare**, run an offline review, and confirm the warning before exporting. Offline exports are **UNVERIFIED**.
-4. Inspect the archive: `proposed/` is the full editable OMOTE JSON subset in the Home Assistant draft; `rollback/` is the original JSON subset imported from the remote; `MANIFEST.json` provides changed file paths, sizes and SHA-256 hashes; `READ_ME_FIRST.txt` contains recovery warnings.
+4. Inspect the archive: `proposed/` is the full editable OMOTE JSON subset in the Home Assistant draft; `imported-baseline/` is the original JSON subset imported from the remote; `MANIFEST.json` and `PORTABLE_INDEX.json` provide changed file paths, sizes and SHA-256 hashes; `READ_ME_FIRST.txt` contains recovery warnings.
 
 The ZIP **does not include** `HaSettings.json`, `DeviceSettings.json`, other known credential files, images, the complete LittleFS filesystem, or a flashable firmware image. Custom JSON values may contain personal or sensitive command data. Protect the downloaded ZIP accordingly. Restoring this limited baseline cannot substitute for a complete device/firmware backup.
 
-A checked or exported archive does not enable wireless deployment. Newer firmware will need an authenticated, versioned, crash-safe transaction protocol and device-side rollback. See [Deployment protocol proposal](docs/DEPLOYMENT_PROTOCOL.md). The user must explicitly approve any firmware modifications.
+A checked or exported archive does not enable wireless deployment. Newer firmware will need an authenticated, versioned, crash-safe single-active transaction protocol and independent local recovery. See [Deployment protocol proposal](docs/DEPLOYMENT_PROTOCOL.md). Firmware development remains on the isolated feature branch; no HACS writes are authorized.
 
 ### Verified backup history and recovery into Home Assistant drafts (v0.1.0-dev11)
 
@@ -130,7 +158,7 @@ Important limitations: these backups deliberately exclude `HaSettings.json`, `De
 
 Select a remote in **OMOTE Manager → Overview** and click **Check firmware safety**. The integration reads only `GET /api/config/v2/capabilities`. Legacy devices that return HTTP 404 are identified as v1 read-only; the firmware branch's `omote-config-v2-preview` is identified as a preview, with transaction/rollback/authentication explicitly unavailable. Invalid, redirecting or oversized responses are rejected.
 
-The inspector reports API generation, authentication mode, advertised transaction/rollback support and an explanation. Device identifiers and raw revision hashes are not displayed. **No capability response can enable deployment in this release, even if every advertised field is positive.** HACS must wait for the finished secure protocol, hardware power-failure tests and explicit rollout approval. Existing v1 status, import and backup compatibility remains intact.
+The inspector reports API generation, authentication mode, transaction support, and the read-only single-active mode and revision when available. Device identifiers are not displayed. **No capability response can enable deployment in this release, even if every advertised field is positive.** HACS must wait for the finished secure protocol, hardware power-failure tests and explicit rollout approval. Existing v1 status, import and backup compatibility remains intact.
 
 The preview implementation exists on the firmware's `feature/config-v2-transactional` branch, not on the known-good `waveshare28v2-port` branch. Do not flash an untested firmware preview as a replacement for a working remote without a recovery procedure.
 
@@ -144,30 +172,29 @@ The firmware mDNS service advertises `id=<12-digit device MAC hex>`, `api=omote-
 
 Your security decisions are binding: initial pairing requires a touchscreen one-time code, and **every individual deployment must subsequently require both HA administrator confirmation and a fresh local touchscreen approval on the target remote**. All v1 and v2 preview firmware stays non-deployable in HACS. See [HACS v2 deployment issue](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues/2) and [firmware issue](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
 
-### LittleFS and boot-selector diagnostics (v0.1.0-dev14)
+### LittleFS and single-active diagnostics (feature dev15)
 
-The **Check firmware safety** button on the OMOTE Manager Overview now also reads
-`GET /api/config/v2/storage/status` when the experimental firmware advertises
-`omote-config-v2-preview`. The panel shows LittleFS total/used/estimated-free
-capacity and the read-only NVS selector health flags. It never reads private
-credentials or writes NVS, flash objects or configurations.
+The **Check firmware safety** button reads `GET /api/config/v2/capabilities`
+and `GET /api/config/v2/storage/status` on v2 devices. The panel shows
+LittleFS total/used/estimated-free capacity and, when advertised,
+`storage_model=single-active`, configuration mode, selected revision and
+recovery state. It does not read credentials or write NVS or LittleFS.
 
-The firmware currently advertises `generation_activation_enabled=false` and
-does not initialize a generation selector merely by inspecting it. On a
-freshly flashed preview, `selector_initialized=false` is expected. NVS
-`nvs_readable=false` on an uninitialized namespace is not by itself evidence
-of filesystem failure. Treat these values as diagnostic only; **no deployment
-or rollback becomes enabled**.
+Legacy previews may still return false/zero A/B selector placeholders, but
+HACS dev15 ignores them: the single-active design has **no previous
+configuration, trial boot, generation selector or automatic rollback**.
+A recovery warning is informational; no upload or resend is enabled.
+
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev14, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. When testing the feature branch build, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 
-- Completed in HACS: device monitoring, verified backup history and draft recovery, shared profiles, command editing, JSON validation, scene/page/button editing, schematic layout preview, colored diffs, remote drift review, and download-only deployment/rollback kit.
-- Firmware proposal (requires explicit user approval): [Authenticated transactional configuration API and rollback](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
-- After firmware approval and hardware validation: gated, user-confirmed HACS deployment with transaction verification and rollback.
+- Completed in HACS: device monitoring, verified backup history and draft recovery, shared profiles, command editing, JSON validation, scene/page/button editing, schematic layout preview, colored diffs, remote drift review, and download-only JSON review and imported-baseline kit.
+- Firmware implementation on isolated branch: [Authenticated single-active configuration API and recovery](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
+- After firmware approval and hardware validation: gated, user-confirmed HACS deployment with transaction verification and manual recovery resend.
 - Later: higher-fidelity LVGL layout preview and optional OTA management.
 
 See [architecture](docs/ARCHITECTURE.md) and the [detailed deployment API proposal](docs/DEPLOYMENT_PROTOCOL.md).

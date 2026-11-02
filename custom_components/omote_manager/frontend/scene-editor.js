@@ -15,6 +15,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     this.busy = false;
     this.layoutEditor = null;
     this.create();
@@ -30,7 +32,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev14";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev15";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -43,6 +45,7 @@ class SceneEditor {
       '<div class="se-pickers"><label>Scene<select id="se-scene"></select></label>',
       '<label>Page<select id="se-page"></select></label></div>',
       '<p id="se-path" class="muted"></p>',
+      '<p id="se-shared-page" class="se-review-warning" role="status"></p>',
       '<div class="se-grid">',
       '<form id="se-scene-form"><h4>Scene metadata</h4>',
       '<label>Menu name<input name="name" maxlength="80" required></label>',
@@ -96,11 +99,31 @@ class SceneEditor {
       '  </div>',
       '  <div class="se-kit-export">',
       '    <div><strong>Deployment &amp; rollback package</strong>',
-      '      <p>Download proposed JSON, original imported files and a SHA-256 manifest.',
+      '      <p>Download reviewed JSON and the imported baseline for offline reference.',
       '      This is not an installable firmware image.</p></div>',
       '    <button type="button" id="se-kit-download" disabled>Download reviewed ZIP</button>',
       '  </div>',
       '  <p id="se-kit-status" role="status" aria-live="polite"></p>',
+      '<div class="se-kit-export">',
+      '  <div><strong>Retained reviewed configuration</strong>',
+      '    <p>Save one immutable reviewed JSON snapshot in Home Assistant,',
+      '    independently of your three historical backups. A newer review replaces',
+      '    only the previous reviewed copy; the remote is never modified.</p></div>',
+      '  <button type="button" id="se-save-reviewed" disabled>Save reviewed copy in HA</button>',
+      '  <button type="button" id="se-load-reviewed" disabled>Load reviewed copy into draft</button>',
+      '</div>',
+      '<p id="se-reviewed-status" role="status" aria-live="polite"></p>',
+      '<div class="se-kit-export">',
+      '  <div><strong>Manual recovery &amp; deployment</strong>',
+      '    <p>Check remote recovery status before preparing a resend. Pairing,',
+      '    uploading and activation remain disabled until the encrypted',
+      '    firmware protocol and physical recovery tests pass.</p></div>',
+      '  <button type="button" id="se-recovery-check">Check recovery state</button>',
+      '  <button type="button" disabled title="Requires authenticated firmware pairing">Pair (unavailable)</button>',
+      '  <button type="button" disabled title="Requires HA admin and new touchscreen approval">Deploy / resend (unavailable)</button>',
+      '</div>',
+      '<p id="se-recovery-status" role="status" aria-live="polite">',
+      '  Recovery is manual: there will be no automatic configuration resend.</p>',
       '</div>',
       '<small>All comparisons, downloads and reviews are read-only. Remote deployment remains disabled.</small></div>'
     ].join("");
@@ -145,6 +168,9 @@ class SceneEditor {
     this.ui("se-only-changes").addEventListener("change", () => this.renderDiff());
     this.ui("se-review-run").addEventListener("click", () => void this.runReview());
     this.ui("se-kit-download").addEventListener("click", () => void this.downloadKit());
+    this.ui("se-save-reviewed").addEventListener("click", () => void this.saveReviewed());
+    this.ui("se-load-reviewed").addEventListener("click", () => void this.loadReviewed());
+    this.ui("se-recovery-check").addEventListener("click", () => void this.checkRecovery());
     this.ui("se-review-check-live").addEventListener("change", () => {
       this.clearReview("Review preference changed. Run review again before downloading.");
     });
@@ -177,7 +203,7 @@ class SceneEditor {
 
   async loadLayoutEditor() {
     try {
-      const module = await import("./layout-editor.js?v=0.1.0-dev14");
+      const module = await import("./layout-editor.js?v=0.1.0-dev15");
       this.layoutEditor = module.attachVisualLayoutEditor(this);
       this.layoutEditor.render();
     } catch (error) {
@@ -197,10 +223,16 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = "Select a remote and run the review.";
     this.ui("se-kit-download").disabled = true;
+    this.ui("se-save-reviewed").disabled = true;
+    this.ui("se-save-reviewed").disabled = true;
     this.ui("se-kit-status").textContent = "";
+    this.ui("se-recovery-status").textContent =
+      "Recovery is manual: there will be no automatic configuration resend.";
     if (this.layoutEditor) this.layoutEditor.onRemoteChanged();
     ++this.token;
     ++this.diffToken;
@@ -231,7 +263,30 @@ class SceneEditor {
     } else if (!this.detail || this.detail.scene_path !== this.scenePath) {
       void this.loadScene();
     }
+    this.renderReviewed();
+    this.ui("se-recovery-check").disabled = !this.entryId;
     void this.refreshDiff();
+  }
+
+  renderReviewed() {
+    const record = this.studio.data?.reviewed?.[this.entryId];
+    const status = this.ui("se-reviewed-status");
+    this.ui("se-load-reviewed").disabled = !record || record.integrity !== "verified";
+    if (!record) {
+      status.textContent = "No reviewed configuration retained for this remote.";
+    } else if (record.integrity !== "verified") {
+      status.textContent =
+        "WARNING: Saved reviewed configuration failed integrity validation. " +
+        "Run a new review and replace it before future recovery.";
+    } else {
+      status.textContent = "Reviewed copy saved " + record.saved_at +
+        " · " + record.file_count + " JSON files · SHA-256 " + record.sha256 +
+        " · " + (record.review_status === "remote-checked"
+          ? "Changed remote paths checked at save time"
+          : "Offline review; remote baseline UNVERIFIED") +
+        (record.matches_current_draft ? " · Matches current draft" :
+          " · Current draft differs from saved review");
+    }
   }
 
   async loadScene() {
@@ -282,9 +337,15 @@ class SceneEditor {
       this.enable(id, Boolean(page));
     }
     if (!page) {
+      this.ui("se-shared-page").textContent = "";
       if (this.layoutEditor) this.layoutEditor.render();
       return;
     }
+    this.ui("se-shared-page").textContent = page.shared_scene_count
+      ? "SHARED PAGE: Changes to widgets, physical key mappings or layout " +
+        "will also affect " + page.shared_scene_count + " other scene(s): " +
+        (page.shared_with_scenes || []).join(", ")
+      : "This page is not shared with another indexed scene.";
     const form = this.ui("se-page-form");
     form.elements.name.value = page.name;
     form.elements.short_name.value = page.short_name;
@@ -350,6 +411,15 @@ class SceneEditor {
 
   async change(message, messageOnSuccess) {
     if (!this.draft || this.busy) return false;
+    if (["omote_manager/editor/edit-widget", "omote_manager/editor/edit-button",
+         "omote_manager/editor/edit-layout"].includes(message.type) &&
+        this.page?.shared_scene_count > 0 &&
+        !window.confirm("This page is also used by " +
+          this.page.shared_scene_count + " other scene(s): " +
+          this.page.shared_with_scenes.join(", ") +
+          ". This draft edit will affect all of them. Continue?")) {
+      return false;
+    }
     this.busy = true;
     const good = await this.studio.change({
       ...message, entry_id: this.entryId
@@ -505,9 +575,12 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = message;
     this.ui("se-kit-download").disabled = true;
+    this.ui("se-save-reviewed").disabled = true;
     this.ui("se-kit-status").textContent = "";
   }
 
@@ -522,9 +595,12 @@ class SceneEditor {
     const button = this.ui("se-review-run");
     button.disabled = true;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     this.reviewHash = null;
     this.reviewRevision = null;
     this.ui("se-kit-download").disabled = true;
+    this.ui("se-save-reviewed").disabled = true;
     this.ui("se-kit-status").textContent = "";
     reportElement.textContent = "Checking draft validation, file hashes and remote drift…";
     try {
@@ -537,11 +613,14 @@ class SceneEditor {
       this.reviewHash = answer.draft_sha256;
       this.reviewRevision = answer.revision;
       this.reviewCheckedLive = Boolean(this.ui("se-review-check-live").checked);
-      this.reviewValid = (
-        answer.errors === 0 && answer.changed_count > 0 &&
+      this.reviewSaveValid = (
+        answer.errors === 0 &&
         (!this.reviewCheckedLive || answer.live_check?.matches === true)
       );
+      this.reviewChangedCount = answer.changed_count;
+      this.reviewValid = this.reviewSaveValid && answer.changed_count > 0;
       this.ui("se-kit-download").disabled = !this.reviewValid;
+      this.ui("se-save-reviewed").disabled = !this.reviewSaveValid;
       this.ui("se-kit-status").textContent = this.reviewValid
         ? (this.reviewCheckedLive
           ? "Kit can be created with a fresh remote-drift check."
@@ -615,6 +694,103 @@ class SceneEditor {
     }
   }
 
+  async saveReviewed() {
+    if (!this.reviewSaveValid || !this.reviewHash || !this.entryId) return;
+    const live = this.ui("se-review-check-live").checked;
+    if (live !== this.reviewCheckedLive) {
+      this.clearReview("Review settings changed; run review again.");
+      return;
+    }
+    if ((!live || this.reviewChangedCount === 0) && !window.confirm(
+      "Retain an OFFLINE, UNVERIFIED reviewed configuration in Home Assistant? " +
+      "The current remote may have changed. No firmware data will be written."
+    )) return;
+    const entry = this.entryId;
+    const sha = this.reviewHash;
+    const revision = this.reviewRevision;
+    const button = this.ui("se-save-reviewed");
+    button.disabled = true;
+    this.ui("se-reviewed-status").textContent = "Saving verified local snapshot…";
+    try {
+      const result = await this.studio.hass().callWS({
+        type: "omote_manager/editor/save-reviewed",
+        entry_id: entry, revision, draft_sha256: sha, check_live: live
+      });
+      if (entry !== this.entryId || sha !== this.reviewHash ||
+          result.deployment_enabled !== false ||
+          result.reviewed_saved?.sha256 !== sha) {
+        throw new Error("Reviewed snapshot response was stale or invalid.");
+      }
+      this.studio.data = result;
+      this.clearReview("Reviewed configuration saved in Home Assistant. " +
+        "Run review again after any edits. Remote was not modified.");
+      this.studio.render();
+    } catch (error) {
+      this.ui("se-reviewed-status").textContent =
+        "Unable to retain review: " + String(error.message || error);
+    } finally {
+      button.disabled = !this.reviewSaveValid;
+    }
+  }
+
+  async loadReviewed() {
+    const entry = this.entryId;
+    const record = this.studio.data?.reviewed?.[entry];
+    if (!entry || !record || record.integrity !== "verified") return;
+    if (!window.confirm(
+      "Replace the current Home Assistant draft with the saved reviewed " +
+      "configuration (" + record.sha256.slice(0, 12) + "…)? " +
+      "Unsent draft edits will be lost. The retained reviewed copy and " +
+      "backup history remain intact. Nothing will be sent to the Waveshare."
+    )) return;
+    const ok = await this.studio.change({
+      type: "omote_manager/editor/load-reviewed",
+      entry_id: entry,
+      reviewed_sha256: record.sha256,
+      replace: true
+    }, "Reviewed configuration loaded into HA draft. Remote not modified.");
+    if (ok && entry === this.entryId) {
+      this.onRemoteChanged();
+      this.clearReview("Reviewed copy loaded into HA draft. Run a fresh review.");
+      this.renderReviewed();
+    }
+  }
+
+  async checkRecovery() {
+    const entry = this.entryId;
+    if (!entry || !this.studio.hass()) return;
+    const button = this.ui("se-recovery-check");
+    const status = this.ui("se-recovery-status");
+    button.disabled = true;
+    status.textContent = "Checking read-only firmware recovery status…";
+    try {
+      const info = await this.studio.hass().callWS({
+        type: "omote_manager/capabilities", entry_id: entry
+      });
+      if (entry !== this.entryId) return;
+      const storage = info.storage_status || {};
+      if (storage.recovery_required === true) {
+        status.textContent = "RECOVERY REQUIRED: " +
+          (storage.recovery_reason || "configuration unavailable") +
+          ". Inspect the device touchscreen. A reviewed HA copy may be prepared " +
+          "for manual resend after secure firmware pairing is available. " +
+          "Nothing will be sent automatically.";
+      } else if (storage.available && storage.storage_model === "single-active") {
+        status.textContent = "Firmware configuration mode: " +
+          storage.config_mode + ". Manual resend remains disabled. " +
+          "No automatic deployment or rollback.";
+      } else {
+        status.textContent = "Recovery state is not advertised by this firmware. " +
+          "No remote changes are possible from Profile Studio.";
+      }
+    } catch (error) {
+      if (entry === this.entryId) status.textContent =
+        "Unable to check recovery: " + String(error.message || error);
+    } finally {
+      button.disabled = !this.entryId;
+    }
+  }
+
   async downloadKit() {
     if (!this.draft || !this.entryId || !this.reviewValid || !this.reviewHash) {
       this.ui("se-kit-status").textContent =
@@ -637,7 +813,7 @@ class SceneEditor {
     const expectedHash = this.reviewHash;
     const revision = this.reviewRevision;
     const status = this.ui("se-kit-status");
-    status.textContent = "Building checked proposal and rollback archive…";
+    status.textContent = "Building reviewed proposal and imported-baseline archive…";
     try {
       const result = await this.studio.hass().callWS({
         type: "omote_manager/editor/export-kit",
@@ -671,7 +847,7 @@ class SceneEditor {
       link.remove();
       // Allow browser download manager to resolve the temporary blob.
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      status.textContent = "Review/rollback ZIP downloaded (" + result.bytes +
+      status.textContent = "Review/baseline ZIP downloaded (" + result.bytes +
         " bytes, " + result.review_status + "). Remote was not modified.";
     } catch (error) {
       status.textContent = "Download failed: " + String(error.message || error) +

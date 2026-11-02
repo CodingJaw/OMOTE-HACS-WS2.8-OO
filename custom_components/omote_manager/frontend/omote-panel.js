@@ -36,7 +36,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev14">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev15">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -120,7 +120,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev14");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev15");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -377,30 +377,46 @@ class OmoteManagerPanel extends HTMLElement {
         "API " + info.api_version +
         " · Authentication: " + info.auth_mode +
         " · Transactions: " + (info.transaction_support ? "advertised" : "unavailable") +
-        " · Rollback: " + (info.rollback_support ? "advertised" : "unavailable") +
         " · Deployment: DISABLED";
       const note = document.createElement("p");
       note.textContent = info.explanation ||
         "Deployments remain disabled until hardware approval.";
       view.append(title, values, note);
-      if (info.preview_only) {
+      if (info.generation !== "legacy-v1") {
         const storage = info.storage_status || {};
         const diagnostics = document.createElement("p");
         diagnostics.className = "capability-storage";
         if (storage.available) {
           const kib = bytes => (Number(bytes) / 1024).toFixed(0) + " KiB";
-          diagnostics.textContent = "LittleFS: " +
+          const model = storage.storage_model === "single-active"
+            ? "Single active configuration" : "Storage model not advertised";
+          const mode = storage.config_mode === "unknown"
+            ? "" : " · Mode: " + storage.config_mode;
+          diagnostics.textContent = model + mode + " · LittleFS " +
             kib(storage.used_bytes) + " used / " +
             kib(storage.total_bytes) + " total · " +
-            kib(storage.estimated_free_bytes) + " estimated free · " +
-            "NVS readable: " + (storage.nvs_readable ? "yes" : "no") + " · " +
-            "Selector initialized: " +
-            (storage.selector_initialized ? "yes" : "no") +
-            " · slots valid: " + Number(storage.slot0_valid) + "/" +
-            Number(storage.slot1_valid) + " · Generation activation: DISABLED";
+            kib(storage.estimated_free_bytes) + " estimated free";
+          if (storage.active_revision_sha256) {
+            const revision = document.createElement("p");
+            revision.className = "capability-storage";
+            revision.textContent = "Active revision SHA-256: " +
+              storage.active_revision_sha256;
+            view.append(revision);
+          }
+          if (storage.recovery_required) {
+            const warning = document.createElement("p");
+            warning.className = "capability-storage";
+            warning.setAttribute("role", "alert");
+            warning.textContent = "RECOVERY REQUIRED (" +
+              (storage.recovery_reason || "configuration unavailable") +
+              "). Check the remote's local recovery screen. " +
+              "No automatic resend will occur; manual administrator and " +
+              "touchscreen approval are required when secure deployment exists.";
+            view.append(warning);
+          }
         } else {
           diagnostics.textContent =
-            "LittleFS and boot-selector diagnostics are unavailable on this firmware.";
+            "LittleFS / single-active configuration diagnostics unavailable.";
         }
         view.append(diagnostics);
       }
@@ -441,6 +457,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v14")) {
-  customElements.define("omote-manager-panel-v14", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v15")) {
+  customElements.define("omote-manager-panel-v15", OmoteManagerPanel);
 }

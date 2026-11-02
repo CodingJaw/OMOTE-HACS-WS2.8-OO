@@ -61,7 +61,41 @@ def _initial() -> dict[str, Any]:
         "locations": [],
         "templates": [],
         "drafts": {},
+        "reviewed": {},
     }
+
+
+def _reviewed_summary(record: dict, draft: dict | None) -> dict:
+    """Return metadata only; detect stored snapshot damage without leaking JSON."""
+    summary = {
+        "saved_at": str(record.get("saved_at", ""))[:64] if isinstance(record, dict) else "",
+        "sha256": "",
+        "file_count": 0,
+        "review_status": "unavailable",
+        "integrity": "damaged",
+        "matches_current_draft": False,
+    }
+    try:
+        files = record["files"]
+        check_bundle_limits(files)
+        if "Scenes.json" not in files or file_digest(files) != record["sha256"]:
+            raise WorkspaceError("Reviewed snapshot integrity check failed")
+        if any(issue["level"] == "error" for issue in validate_bundle(files)):
+            raise WorkspaceError("Reviewed snapshot validation failed")
+        if record.get("review_status") not in ("remote-checked", "offline-unverified"):
+            raise WorkspaceError("Reviewed snapshot verification state is invalid")
+    except (KeyError, TypeError, ValueError, AttributeError, WorkspaceError):
+        return summary
+    summary.update({
+        "sha256": record["sha256"],
+        "file_count": len(files),
+        "review_status": record["review_status"],
+        "integrity": "verified",
+        "matches_current_draft": bool(
+            draft and file_digest(draft["files"]) == record["sha256"]
+        ),
+    })
+    return summary
 
 
 def _draft_summary(entry_id: str, draft: dict) -> dict:
@@ -97,6 +131,8 @@ class WorkspaceStore:
             if not isinstance(state, dict) or state.get("schema_version") != 1:
                 raise WorkspaceError("Unsupported OMOTE workspace storage version")
             self._state = state
+            # Schema v1 predates separately retained reviewed snapshots.
+            self._state.setdefault("reviewed", {})
 
     def _read(self) -> dict[str, Any]:
         return deepcopy(self._state)
@@ -120,6 +156,10 @@ class WorkspaceStore:
             "drafts": {
                 entry_id: _draft_summary(entry_id, draft)
                 for entry_id, draft in state["drafts"].items()
+            },
+            "reviewed": {
+                entry_id: _reviewed_summary(record, state["drafts"].get(entry_id))
+                for entry_id, record in state.get("reviewed", {}).items()
             },
             "deployment_enabled": False,
         }
@@ -419,6 +459,71 @@ class WorkspaceStore:
             if item["before_sha256"] is not None
         }
         return report, proposed, baseline, originals
+
+    async def async_save_reviewed(
+        self, expected_revision: int, entry_id: str,
+        expected_sha256: str, *, live_checked: bool,
+    ) -> dict[str, Any]:
+        """Pin one explicitly reviewed HA-only configuration per remote.
+
+        This operation never calls the device. Previous imported backups live
+        in the independent backup history store and remain untouched.
+        """
+        if type(live_checked) is not bool:
+            raise WorkspaceError("Invalid live verification selection")
+
+        def operation(state):
+            draft = state["drafts"].get(entry_id)
+            if draft is None:
+                raise WorkspaceError("Import a remote before saving a reviewed copy")
+            files = draft["files"]
+            check_bundle_limits(files)
+            digest = file_digest(files)
+            if digest != expected_sha256:
+                raise WorkspaceError("Draft changed since review; rerun preflight")
+            report = make_review(files, draft["base_files"])
+            if report["errors"]:
+                raise WorkspaceError("Fix validation errors before retaining a review")
+            reviewed = state.setdefault("reviewed", {})
+            if entry_id not in reviewed and len(reviewed) >= MAX_DRAFTS:
+                raise WorkspaceError("Too many reviewed remote configurations")
+            reviewed[entry_id] = {
+                "saved_at": _now(),
+                "sha256": digest,
+                "baseline_sha256": report["baseline_sha256"],
+                "review_status": (
+                    "remote-checked" if live_checked else "offline-unverified"
+                ),
+                "files": dict(files),
+            }
+        await self._mutate(expected_revision, operation)
+        return self.summary()["reviewed"][entry_id]
+
+    def reviewed_snapshot(self, entry_id: str) -> dict[str, str]:
+        """Return a validated copy for a future authenticated resend flow."""
+        record = self._state.get("reviewed", {}).get(entry_id)
+        if record is None:
+            raise WorkspaceError("No reviewed configuration saved for this remote")
+        meta = _reviewed_summary(record, None)
+        if meta["integrity"] != "verified":
+            raise WorkspaceError("Reviewed configuration is damaged")
+        return deepcopy(record["files"])
+
+    async def async_load_reviewed_to_draft(
+        self, expected_revision: int, entry_id: str,
+        expected_sha256: str, *, replace: bool = False,
+    ) -> None:
+        """Explicitly restore retained JSON into a HA draft, never to firmware.
+
+        The reviewed snapshot remains immutable and independent of the draft
+        even after replacement. A hash and revision prevent stale UI actions.
+        """
+        files = self.reviewed_snapshot(entry_id)
+        if file_digest(files) != expected_sha256:
+            raise WorkspaceError("Reviewed configuration changed; refresh first")
+        await self.async_import(
+            expected_revision, entry_id, files, replace=replace,
+        )
 
     def diff(self, entry_id: str, path: str | None = None) -> dict[str, Any]:
         """Inspect local draft changes without exposing other configuration."""

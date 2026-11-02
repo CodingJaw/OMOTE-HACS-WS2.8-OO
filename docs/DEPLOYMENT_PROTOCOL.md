@@ -1,151 +1,105 @@
-# OMOTE safe deployment protocol — proposed firmware change
+# OMOTE Config v2 — HACS single-active handoff (draft)
 
-**Firmware tracking issue:** [CodingJaw/OMOTE-Firmware-WS2.8-OO #1](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
+**Status: NOT IMPLEMENTED OR DEPLOYABLE.** This document describes the
+integration contract to finalize with the firmware team. It is not a working
+network API. No Home Assistant command currently sends firmware writes.
 
-**Status:** Design proposal only; implementation requires firmware approval and
-hardware testing. Nothing in this document authorizes writes to running devices.
+**Authoritative firmware design:**
+[CONFIG_V2_SINGLE_ACTIVE_DESIGN.md](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/blob/feature/config-v2-transactional/docs/CONFIG_V2_SINGLE_ACTIVE_DESIGN.md)
 
-## Current firmware limitations
+**Tracking:** [HACS issue #2](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues/2),
+[firmware issue #1](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
 
-The Waveshare port at
-\`Platformio/lib/esp32HalImpl/wifiHandler/config_http.cpp\` currently exposes:
+## Current user-approved decisions
 
-- \`POST /api/fs/write?path=...\` and \`PUT /api/fs/write?path=...\`, which
-  truncate and write the active LittleFS path directly;
-- \`POST /api/fs/delete?path=...\`, which removes the active path directly;
-- \`GET /api/fs/tree\`, \`/api/fs/stat\`, \`/api/fs/read/raw\` and
-  \`/api/fs/read/chunk\` for read-only inspection;
-- \`POST /api/device/reboot\` and \`/api/device/sync-mode\` for reboot and
-  editor synchronization.
+- Exactly **one active configuration** on the Waveshare. No A/B
+  generations, automatic rollback, previous/pending generation, trial boot
+  or remote rollback endpoint.
+- Home Assistant retains the **latest explicitly reviewed JSON draft**
+  separately from a bounded history of **three imported backups**.
+- Recovery is **manual only**: alert the HA administrator and let them
+  select a saved reviewed copy, but never automatically upload or resend.
+- Every deployment and recovery resend requires an authenticated HA
+  administrator **and a new physical touchscreen approval on the target**.
+- Keep Profile Studio's review, approval and eventual deployment controls
+  together. Discovery uses mDNS with manual IP/hostname fallback.
+- HACS deploy remains server-side disabled until the encrypted firmware
+  protocol, atomic single-pointer activation and physical recovery testing
+  pass. No changes to `waveshare28v2-port`.
 
-There is currently no authentication on the write endpoints, no multi-file
-transaction, no active/previous generation, no atomic commit marker, no
-rollback endpoint and no confirmed post-reboot health acknowledgment. The
-current API has permissive cross-origin response headers. Do not expose
-port 80 to the Internet or untrusted networks. HACS must not invoke any
-configuration-writing endpoint until a secure implementation is approved.
+## Implemented now (feature branch, read-only)
 
-## Proposed API version
+1. Legacy v1 and v2-preview capability negotiation. Retired A/B fields are
+   accepted when present but never required or shown as functional rollback.
+2. Read-only LittleFS status normalizes `storage_model=single-active`,
+   `config_mode=legacy|active|recovery`, `recovery_required`,
+   `recovery_reason`, `active_revision_sha256`, and capacity counters.
+   Malformed or inconsistent states fail closed. Firmware flags never enable
+   remote mutations.
+3. The Overview panel displays the active mode and recovery warning.
+   Profile Studio offers an explicit read-only recovery check. No automatic
+   background action or network write occurs.
+4. Profile Studio can retain one reviewed, validated JSON snapshot per remote
+   in HA private storage; backup history remains independent. The reviewed
+   snapshot is SHA-256 checked when read, and metadata (not content) is
+   returned over the standard workspace WebSocket.
+5. The offline ZIP contains `proposed/`, `imported-baseline/`,
+   `MANIFEST.json`, and `PORTABLE_INDEX.json`. It is a **JSON-only**
+   reference, not a firmware-ready image, not a complete device backup and
+   not a deployable firmware manifest. Binary image assets and private
+   settings are excluded.
 
-Keep \`omote-config-v1\` read-only support in HACS. Add a capability-negotiated
-\`omote-config-v2\` transaction interface without changing v1 file-read behavior.
-A v2 version string alone must not enable deployment; all required capabilities
-must be positively verified.
+## Draft firmware API contract — NOT OPERATIONAL
 
-\`GET /api/config/v2/capabilities\` (auth requirement depends on privacy policy):
-\`device_id\`, \`firmware_build\`, \`api_version\`, \`auth_mode\`, \`max_file_bytes\`,
-\`max_transaction_bytes\`, \`available_staging_bytes\`,
-\`active_revision_sha256\`, \`previous_revision_sha256\`,
-\`transaction_support\`, \`rollback_support\`,
-\`write_protection_enabled\`.
+All mutation endpoints below require a device-bound encrypted authenticated
+session and replay-resistant request identifiers. No secrets in URL query
+strings, discovery TXT or unauthenticated status responses.
 
-All state mutations require authenticated requests bound to the particular
-device and to a server-generated unpredictable nonce. A local pairing flow
-with physical confirmation on the device is preferred. Authentication must
-protect against replay and credential theft; do not place bearer tokens or
-pairing secrets in URLs or send sensitive tokens unprotected over plaintext
-HTTP. Require an authenticated transport (e.g. TLS with certificate pinning or
-an equivalently reviewed secure channel). CORS must not grant anonymous
-cross-origin configuration writes. Rate-limit authentication failures.
+| Method | Path | Intended behavior |
+|---|---|---|
+| GET | `/api/config/v2/capabilities` | Public nonsecret version, limits and write-disabled status |
+| GET | `/api/config/v2/storage/status` | Read-only storage model, recovery mode, active SHA-256 |
+| POST | `/api/config/v2/pair/*` | Physical one-time-code device pairing; contract pending |
+| POST | `/api/config/v2/transactions` | Begin device-bound staged transaction against expected active SHA |
+| PUT | `/api/config/v2/transactions/{id}/files/{path}` | Bounded, idempotent, checksum-verified chunks |
+| POST | `/api/config/v2/transactions/{id}/validate` | Verify complete manifest, all hashes, graph and assets |
+| POST | `/api/config/v2/transactions/{id}/commit` | Require new local touchscreen approval and atomically select one manifest |
+| GET | `/api/config/v2/transactions/{id}` | Status and safe recovery from uncertain response |
+| DELETE | `/api/config/v2/transactions/{id}` | Abort inactive staging |
 
-## Transaction lifecycle
+**No rollback endpoint.** A corrupted active configuration must start a
+firmware-owned local recovery UI and retain independent Wi-Fi/provisioning
+capability. Only after authenticated reconnection may an administrator
+explicitly resend a reviewed configuration through the same staged,
+touchscreen-approved transaction flow.
 
-1. **Preflight** (read-only): Home Assistant computes SHA-256 over the exact
-   bytes of its saved baseline and proposed files, validates JSON-with-comments
-   and cross-file references, queries the current active firmware revision and
-   confirms that the remote still matches the imported baseline. Reject stale
-   revisions, missing capacity, unknown file paths and unsupported firmware.
-2. **Begin**:
-   \`POST /api/config/v2/transactions\` with unique request ID, target
-   manifest digest and \`if_active_revision_sha256\`. The device refuses if a
-   transaction is active, the baseline differs or space is insufficient.
-   Return a short-lived transaction identifier and staging limits.
-3. **Stage**:
-   \`PUT /api/config/v2/transactions/{id}/files/{safe_path}\` with verified
-   content-range/offset and per-file SHA-256, streaming in small chunks.
-   Staging must never truncate an active file. No traversal, credential or
-   unrecognized file path is allowed. Retries must be idempotent and detect
-   changed bytes at an offset.
-4. **Validate**:
-   \`POST /api/config/v2/transactions/{id}/validate\`. Check every staged
-   length and digest, parse all JSON, resolve scene/page/command references,
-   confirm storage quotas and calculate the staged generation digest.
-5. **Commit**:
-   \`POST /api/config/v2/transactions/{id}/commit\` with precondition hashes
-   and an explicit confirmation token. The firmware activates the entire
-   validated generation as one recoverable operation, not a sequence of
-   direct writes. Prefer A/B generation storage plus a crash-safe active
-   manifest/pointer, or a carefully reviewed journaled alternative.
-6. **Verify health**:
-   A reboot/reload must report the activated digest, successful scene loading
-   and a stable API response. The prior generation remains available. If
-   a boot fails, CRC/hash mismatches, filesystem corruption or a watchdog
-   reset occurs, automatically recover the known-good generation.
-7. **Acknowledge**:
-   Home Assistant confirms the new digest, marks the previous revision as
-   rollback-ready and saves the deployment result. If the status is unknown,
-   report uncertainty rather than automatically retrying a commit.
-8. **Rollback**:
-   \`POST /api/config/v2/rollback\` with required authentication, expected
-   current digest and explicit user confirmation. Restore the prior coherent
-   generation and verify its new active digest.
-9. **Abort**:
-   \`DELETE /api/config/v2/transactions/{id}\` cleans temporary data without
-   altering active JSON. Expired transactions must be garbage-collected.
+## Security and compatibility requirements
 
-A single-file rename is not an atomic multi-file transaction. If the current
-firmware loads JSON from fixed root paths, the implementation must either
-adopt an A/B-aware path resolver for all JSON load sites or provide a
-crash-recoverable journal that prevents readers from seeing a partially
-updated scene/page/command graph. Account for existing LittleFS root layout
-and non-JSON assets before changing load paths.
+- mDNS MAC/TXT and an IP address are untrusted hints, never pairing identities.
+- HACS must pin a verified device identity and reject device swaps, replay,
+  stale active SHA, concurrent edits, unapproved touchscreen sessions and
+  truncated/oversized payloads.
+- DeviceSettings.json, HaSettings.json, NVS Wi-Fi credentials, MQTT/FTP/NTP
+  secrets and pairing keys must not enter portable shared profiles. A separate
+  opt-in encrypted per-device settings flow is future work.
+- JSON-only review packages must never claim complete image dependency
+  coverage. Real secure deployment requires exact referenced image assets
+  and cross-file validation from firmware.
+- HA Core 2024.9.1 compatibility must be preserved. Old preview responses
+  with false/empty A/B placeholder fields remain readable, but never
+  activate rollback UI.
+- Keep admin-only WebSocket authorization, bounded responses and strict
+  optimistic workspace revision checks.
 
-## Required safety properties
+## Hardware acceptance gate (before enabling writes)
 
-- The device remains usable without Home Assistant, cloud access or Wi-Fi.
-- The default system must reject unauthenticated writes. Legacy \`/api/fs/write\`
-  and \`/api/fs/delete\` should be disabled or explicitly protected in normal
-  operation; preserve a documented physically authorized recovery path.
-- No automatic deployments. The HA user must choose the target remote, inspect
-  a colored diff and backup, pass validation/drift checks and confirm deploy.
-- A transaction is bound to one device ID, firmware build and base revision.
-  Concurrent HACS users must not silently overwrite each other.
-- Account for flash endurance, maximum JSON size, free space, PSRAM/heap limits,
-  power loss during staging/commit/rollback and interrupted Wi-Fi.
-- Never stage, display or log \`HaSettings.json\`, MQTT credentials, or other
-  sensitive files through the initial HACS deployment surface.
-- Keep a known-good fallback and explicit recovery instructions for corrupted
-  LittleFS, repeated watchdog resets or failed firmware updates.
-- Avoid logging secrets, raw authentication headers or complete JSON payloads.
-- Firmware may reject configurations unsupported by its build even when HA
-  structural validation succeeded. Do not equate static validation with
-  hardware correctness.
+- Verify full 16 MiB flash backup integrity and safe recovery/restore.
+- Confirm runtime loads only the selected immutable snapshot; malformed
+  graphs enter independent recovery instead of crashing the UI.
+- Verify real PNG/JPEG/image decoding from content-addressed objects.
+- Test USB power cuts during staging and active-pointer commit.
+- Test HA disconnect/reconnect and manual secure resend from recovery.
+- Verify standalone touchscreen/UI responsiveness and no silent writes.
+- Complete pairing, replay and touchscreen approval adversarial tests.
 
-## Integration gating
-
-HACS release v0.1.0-dev10 creates a **download-only** ZIP containing
-\`proposed/\`, \`rollback/\` and \`MANIFEST.json\`. The ZIP is not uploaded.
-Future enabling criteria:
-
-- A v2 firmware implementation and tests exist on a separate approved
-  firmware branch, with demonstrated interrupted-write and rollback recovery.
-- HACS integration tests cover auth denial, precondition conflicts, crash
-  recovery, staging cancellation, verification timeouts and rollback.
-- A distinct opt-in UI path requires administrator approval per deployment.
-- A hard kill-switch leaves direct deployment off for unsupported devices.
-- Firmware modifications must not be merged into the working Waveshare
-  branch until tested and explicitly approved by the user.
-
-## Hardware acceptance checklist
-
-Test on a Waveshare ESP32-S3-Touch-LCD-2.8 V2 with current working firmware:
-
-- A/B storage fits in the configured flash partition under realistic file size.
-- Kill power during each staging, validation, commit and rollback phase:
-  active scenes are intact or restored automatically.
-- Simulate Wi-Fi dropout, duplicate requests, hostile paths, bogus auth and
-  wrong hashes; confirm no active file is partially changed.
-- Verify scene switch, LVGL touchscreen, physical keys and key wake behavior
-  after reload and rollback.
-- Verify that a new remote can be added later and inherits the intended
-  reusable scene profiles only with explicit assignment.
+**Deployment kill switch remains OFF until every gate is demonstrated.**

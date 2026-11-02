@@ -74,7 +74,14 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("omote_manager/editor/export-kit", (ROOT / "release_ws.py").read_text())
         self.assertIn("build_deployment_kit", (ROOT / "release_model.py").read_text())
         self.assertIn("proposed", (ROOT / "release_model.py").read_text())
-        self.assertIn("rollback", (ROOT / "release_model.py").read_text())
+        self.assertIn("imported-baseline", (ROOT / "release_model.py").read_text())
+        self.assertIn("PORTABLE_INDEX.json", (ROOT / "release_model.py").read_text())
+        self.assertIn("ws_save_reviewed", (ROOT / "release_ws.py").read_text())
+        self.assertIn("se-save-reviewed", diff_view)
+        self.assertIn("se-load-reviewed", diff_view)
+        self.assertIn("ws_load_reviewed", (ROOT / "release_ws.py").read_text())
+        self.assertIn("se-recovery-check", diff_view)
+        self.assertIn("async_save_reviewed", (ROOT / "workspace_store.py").read_text())
         backup_history = (ROOT / "backup_history.py").read_text()
         backup_ws = (ROOT / "backup_ws.py").read_text()
         workspace_js = (FRONTEND / "workspace-panel.js").read_text()
@@ -104,6 +111,12 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("storage_status", panel_js)
         self.assertIn("async def storage_status", capability_api)
         self.assertIn("summarize_storage_status", (ROOT / "capability_model.py").read_text())
+        self.assertIn("single-active", panel_js)
+        self.assertNotIn("Generation activation: DISABLED", panel_js)
+        self.assertIn("recovery_required", panel_js)
+        self.assertIn("se-shared-page", diff_view)
+        self.assertIn("shared_scene_count", diff_view)
+        self.assertIn("shared_with_scenes", (ROOT / "editor_model.py").read_text())
 
 
 
