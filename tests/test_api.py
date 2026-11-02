@@ -54,7 +54,10 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         self.chunk_calls = 0
         self.raw_calls = 0
         self.source = DOC
+        self.status_mode = "good"
+        self.raw_mode = "fragmented"
         app = web.Application()
+        app.router.add_get("/api/status", self._status)
         app.router.add_get("/api/fs/stat", self._stat)
         app.router.add_get("/api/fs/read/raw", self._raw)
         app.router.add_get("/api/fs/read/chunk", self._chunk)
@@ -71,6 +74,17 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         await self.session.close()
         await self.runner.cleanup()
 
+    async def _status(self, request):
+        if self.status_mode == "redirect":
+            raise web.HTTPFound(location="http://127.0.0.1:1/secret")
+        if self.status_mode == "oversize":
+            return web.Response(
+                body=b'{"api":"omote-config-v1","padding":"' +
+                b"x" * (128 * 1024) + b'"}',
+                content_type="application/json",
+            )
+        return web.json_response({"api": "omote-config-v1"})
+
     async def _stat(self, request):
         path = request.query.get("path")
         return web.json_response({"path": path, "size": len(self.source)})
@@ -78,6 +92,8 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
     async def _raw(self, request):
         self.raw_calls += 1
         body = self.source
+        if self.raw_mode == "redirect":
+            raise web.HTTPFound(location="http://127.0.0.1:1/secret")
         if self.raw_mode == "partial":
             body = body[:1234]
         elif self.raw_mode == "corrupt":
@@ -98,6 +114,8 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         path = request.query.get("path")
         offset = int(request.query.get("offset", 0))
         count = int(request.query.get("max", 2048))
+        if self.chunk_mode == "redirect":
+            raise web.HTTPFound(location="http://127.0.0.1:1/secret")
         data = self.source[offset:offset + count]
         if self.chunk_mode == "partial":
             data = data[:-4]
@@ -113,6 +131,28 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         return web.Response(
             body=data, headers=headers, content_type="application/octet-stream"
         )
+
+    async def test_legacy_json_redirect_rejected(self):
+        self.status_mode = "redirect"
+        with self.assertRaises(client.OmoteApiError):
+            await self.api.status()
+
+    async def test_legacy_json_oversize_rejected(self):
+        self.status_mode = "oversize"
+        with self.assertRaisesRegex(client.OmoteApiError, "expected size"):
+            await self.api.status()
+
+    async def test_raw_redirect_falls_back_to_valid_chunk(self):
+        self.raw_mode = "redirect"
+        result = await self.api.read_file("Commands/Test.json", verify_json=True)
+        self.assertEqual(result.encode("utf-8"), DOC)
+        self.assertGreater(self.chunk_calls, 0)
+
+    async def test_redirects_never_supply_raw_or_chunk_bytes(self):
+        self.raw_mode = "redirect"
+        self.chunk_mode = "redirect"
+        with self.assertRaises(client.OmoteApiError):
+            await self.api.read_file("Commands/Test.json", verify_json=True)
 
     async def test_fragments_consumed_to_eof(self):
         result = await self.api.read_file("Commands/Test.json", verify_json=True)
