@@ -162,8 +162,8 @@ async def ws_save_reviewed(hass: HomeAssistant, connection, msg: dict) -> None:
             raise WorkspaceError("Workspace changed; run review again")
         if report["draft_sha256"] != msg["draft_sha256"]:
             raise WorkspaceError("Draft changed; run review again")
-        if report["errors"] or not report["changed_count"]:
-            raise WorkspaceError("Fix validation errors and review changed files")
+        if report["errors"]:
+            raise WorkspaceError("Fix validation errors before retaining a review")
         if msg["check_live"]:
             try:
                 report = await _remote_preflight(
@@ -179,7 +179,7 @@ async def ws_save_reviewed(hass: HomeAssistant, connection, msg: dict) -> None:
                 raise WorkspaceError("Remote drift or stale draft; run review again")
         metadata = await store.async_save_reviewed(
             msg["revision"], msg["entry_id"], msg["draft_sha256"],
-            live_checked=msg["check_live"],
+            live_checked=bool(msg["check_live"] and report["changed_count"]),
         )
     except WorkspaceError as exc:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(exc))

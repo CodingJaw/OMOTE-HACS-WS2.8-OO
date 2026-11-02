@@ -101,6 +101,15 @@ class TestRetainedReviewed(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.summary()["revision"], 2)
         self.assertEqual(self.store.summary()["reviewed"], {})
 
+    async def test_unchanged_valid_import_can_be_retained_for_recovery(self):
+        await self.store.async_import(2, "remote-1", original(), replace=True)
+        result = await self.store.async_save_reviewed(
+            3, "remote-1", model.file_digest(original()), live_checked=False
+        )
+        self.assertEqual(result["sha256"], model.file_digest(original()))
+        self.assertEqual(result["review_status"], "offline-unverified")
+        self.assertEqual(self.store.reviewed_snapshot("remote-1"), original())
+
     async def test_offline_review_labeled_unverified(self):
         meta = await self.store.async_save_reviewed(
             2, "remote-1", model.file_digest(edited()), live_checked=False

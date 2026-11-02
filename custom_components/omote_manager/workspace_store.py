@@ -484,8 +484,6 @@ class WorkspaceStore:
             report = make_review(files, draft["base_files"])
             if report["errors"]:
                 raise WorkspaceError("Fix validation errors before retaining a review")
-            if not report["changed_count"]:
-                raise WorkspaceError("No reviewed changes to retain")
             reviewed = state.setdefault("reviewed", {})
             if entry_id not in reviewed and len(reviewed) >= MAX_DRAFTS:
                 raise WorkspaceError("Too many reviewed remote configurations")

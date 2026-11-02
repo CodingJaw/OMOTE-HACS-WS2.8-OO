@@ -15,6 +15,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     this.busy = false;
     this.layoutEditor = null;
     this.create();
@@ -219,6 +221,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = "Select a remote and run the review.";
     this.ui("se-kit-download").disabled = true;
@@ -275,7 +279,7 @@ class SceneEditor {
       status.textContent = "Reviewed copy saved " + record.saved_at +
         " · " + record.file_count + " JSON files · SHA-256 " + record.sha256 +
         " · " + (record.review_status === "remote-checked"
-          ? "Remote baseline checked at save time"
+          ? "Changed remote paths checked at save time"
           : "Offline review; remote baseline UNVERIFIED") +
         (record.matches_current_draft ? " · Matches current draft" :
           " · Current draft differs from saved review");
@@ -568,6 +572,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = message;
     this.ui("se-kit-download").disabled = true;
@@ -586,6 +592,8 @@ class SceneEditor {
     const button = this.ui("se-review-run");
     button.disabled = true;
     this.reviewValid = false;
+    this.reviewSaveValid = false;
+    this.reviewChangedCount = 0;
     this.reviewHash = null;
     this.reviewRevision = null;
     this.ui("se-kit-download").disabled = true;
@@ -602,12 +610,14 @@ class SceneEditor {
       this.reviewHash = answer.draft_sha256;
       this.reviewRevision = answer.revision;
       this.reviewCheckedLive = Boolean(this.ui("se-review-check-live").checked);
-      this.reviewValid = (
-        answer.errors === 0 && answer.changed_count > 0 &&
+      this.reviewSaveValid = (
+        answer.errors === 0 &&
         (!this.reviewCheckedLive || answer.live_check?.matches === true)
       );
+      this.reviewChangedCount = answer.changed_count;
+      this.reviewValid = this.reviewSaveValid && answer.changed_count > 0;
       this.ui("se-kit-download").disabled = !this.reviewValid;
-      this.ui("se-save-reviewed").disabled = !this.reviewValid;
+      this.ui("se-save-reviewed").disabled = !this.reviewSaveValid;
       this.ui("se-kit-status").textContent = this.reviewValid
         ? (this.reviewCheckedLive
           ? "Kit can be created with a fresh remote-drift check."
@@ -682,13 +692,13 @@ class SceneEditor {
   }
 
   async saveReviewed() {
-    if (!this.reviewValid || !this.reviewHash || !this.entryId) return;
+    if (!this.reviewSaveValid || !this.reviewHash || !this.entryId) return;
     const live = this.ui("se-review-check-live").checked;
     if (live !== this.reviewCheckedLive) {
       this.clearReview("Review settings changed; run review again.");
       return;
     }
-    if (!live && !window.confirm(
+    if ((!live || this.reviewChangedCount === 0) && !window.confirm(
       "Retain an OFFLINE, UNVERIFIED reviewed configuration in Home Assistant? " +
       "The current remote may have changed. No firmware data will be written."
     )) return;
@@ -716,7 +726,7 @@ class SceneEditor {
       this.ui("se-reviewed-status").textContent =
         "Unable to retain review: " + String(error.message || error);
     } finally {
-      button.disabled = !this.reviewValid;
+      button.disabled = !this.reviewSaveValid;
     }
   }
 
