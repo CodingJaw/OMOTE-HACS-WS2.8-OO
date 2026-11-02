@@ -15,6 +15,7 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewEligible = false;
     this.busy = false;
     this.layoutEditor = null;
     this.create();
@@ -30,7 +31,7 @@ class SceneEditor {
   create() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev15";
+    css.href = "/omote_manager_static/scene-editor.css?v=0.1.0-dev16";
     this.studio.root.append(css);
     const section = document.createElement("section");
     section.className = "scene-editor";
@@ -95,12 +96,21 @@ class SceneEditor {
       '    No review performed yet. Remote files will never be written by this check.',
       '  </div>',
       '  <div class="se-kit-export">',
-      '    <div><strong>Deployment &amp; rollback package</strong>',
-      '      <p>Download proposed JSON, original imported files and a SHA-256 manifest.',
+      '    <div><strong>Single-active review package</strong>',
+      '      <p>Download proposed JSON, original imported baseline and a SHA-256 manifest.',
       '      This is not an installable firmware image.</p></div>',
-      '    <button type="button" id="se-kit-download" disabled>Download reviewed ZIP</button>',
+      '    <button type="button" id="se-kit-download" disabled>Download single-active review ZIP</button>',
       '  </div>',
+      '  <div class="se-review-retention"><div><strong>Retain reviewed configuration</strong>',
+      '    <p>Keep validated JSON in Home Assistant separately from the working draft and backup history.</p></div>',
+      '    <button type="button" id="se-retain-reviewed" disabled>Save reviewed snapshot in HA</button></div>',
       '  <p id="se-kit-status" role="status" aria-live="polite"></p>',
+      '  <div class="se-review-retention"><div><strong>Manual recovery and device pairing</strong>',
+      '    <p>If the remote enters recovery mode, select your retained reviewed snapshot or',
+      '    verified JSON backup in Profile Studio. Device re-send will require a fresh',
+      '    Home Assistant administrator approval and physical touchscreen confirmation.',
+      '    Pairing and secure resend await the firmware contract.</p></div>',
+      '    <button type="button" id="se-recovery-resend" disabled title="Firmware authenticated recovery API is not implemented">Resend unavailable</button></div>',
       '</div>',
       '<small>All comparisons, downloads and reviews are read-only. Remote deployment remains disabled.</small></div>'
     ].join("");
@@ -145,6 +155,7 @@ class SceneEditor {
     this.ui("se-only-changes").addEventListener("change", () => this.renderDiff());
     this.ui("se-review-run").addEventListener("click", () => void this.runReview());
     this.ui("se-kit-download").addEventListener("click", () => void this.downloadKit());
+    this.ui("se-retain-reviewed").addEventListener("click", () => void this.retainReviewed());
     this.ui("se-review-check-live").addEventListener("change", () => {
       this.clearReview("Review preference changed. Run review again before downloading.");
     });
@@ -177,7 +188,7 @@ class SceneEditor {
 
   async loadLayoutEditor() {
     try {
-      const module = await import("./layout-editor.js?v=0.1.0-dev15");
+      const module = await import("./layout-editor.js?v=0.1.0-dev16");
       this.layoutEditor = module.attachVisualLayoutEditor(this);
       this.layoutEditor.render();
     } catch (error) {
@@ -197,6 +208,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewEligible = false;
+    this.ui("se-retain-reviewed").disabled = true;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = "Select a remote and run the review.";
     this.ui("se-kit-download").disabled = true;
@@ -505,6 +518,8 @@ class SceneEditor {
     this.reviewRevision = null;
     this.reviewCheckedLive = null;
     this.reviewValid = false;
+    this.reviewEligible = false;
+    this.ui("se-retain-reviewed").disabled = true;
     ++this.reviewToken;
     this.ui("se-review-report").textContent = message;
     this.ui("se-kit-download").disabled = true;
@@ -522,9 +537,11 @@ class SceneEditor {
     const button = this.ui("se-review-run");
     button.disabled = true;
     this.reviewValid = false;
+    this.reviewEligible = false;
     this.reviewHash = null;
     this.reviewRevision = null;
     this.ui("se-kit-download").disabled = true;
+    this.ui("se-retain-reviewed").disabled = true;
     this.ui("se-kit-status").textContent = "";
     reportElement.textContent = "Checking draft validation, file hashes and remote drift…";
     try {
@@ -541,6 +558,11 @@ class SceneEditor {
         answer.errors === 0 && answer.changed_count > 0 &&
         (!this.reviewCheckedLive || answer.live_check?.matches === true)
       );
+      this.reviewEligible = (
+        answer.errors === 0 &&
+        (!this.reviewCheckedLive || answer.live_check?.matches === true)
+      );
+      this.ui("se-retain-reviewed").disabled = !this.reviewEligible;
       this.ui("se-kit-download").disabled = !this.reviewValid;
       this.ui("se-kit-status").textContent = this.reviewValid
         ? (this.reviewCheckedLive
@@ -615,6 +637,33 @@ class SceneEditor {
     }
   }
 
+  async retainReviewed() {
+    if (!this.reviewEligible || !this.reviewHash || !this.entryId ||
+        this.reviewHash !== this.draft?.current_sha256 ||
+        this.reviewRevision !== this.studio.data?.revision) {
+      this.clearReview("Review is stale; run review again before retaining.");
+      return;
+    }
+    const entryId = this.entryId;
+    const digest = this.reviewHash;
+    if (!window.confirm(
+      "Retain this validated JSON configuration in HOME ASSISTANT, independently " +
+      "of the editable draft and backup history? This replaces the previously " +
+      "retained reviewed snapshot for this remote. Image assets and private " +
+      "settings are excluded. It does NOT send or activate configuration " +
+      "on the Waveshare."
+    )) return;
+    const success = await this.studio.change({
+      type: "omote_manager/reviewed/retain",
+      entry_id: entryId,
+      draft_sha256: digest
+    }, "Reviewed configuration retained securely in Home Assistant only.");
+    if (success) {
+      this.clearReview("Reviewed JSON retained in Home Assistant. The Waveshare was not changed.");
+      this.studio.renderReviewed();
+    }
+  }
+
   async downloadKit() {
     if (!this.draft || !this.entryId || !this.reviewValid || !this.reviewHash) {
       this.ui("se-kit-status").textContent =
@@ -627,7 +676,7 @@ class SceneEditor {
       return;
     }
     if (!isLive && !window.confirm(
-      "Download an OFFLINE, UNVERIFIED deployment-review kit? The archive " +
+      "Download an OFFLINE, UNVERIFIED single-active review kit? The archive " +
       "will not claim that its baseline matches the current Waveshare. " +
       "It is not a flashable firmware image."
     )) return;
@@ -637,7 +686,7 @@ class SceneEditor {
     const expectedHash = this.reviewHash;
     const revision = this.reviewRevision;
     const status = this.ui("se-kit-status");
-    status.textContent = "Building checked proposal and rollback archive…";
+    status.textContent = "Building checked proposal and imported baseline archive…";
     try {
       const result = await this.studio.hass().callWS({
         type: "omote_manager/editor/export-kit",
@@ -671,7 +720,7 @@ class SceneEditor {
       link.remove();
       // Allow browser download manager to resolve the temporary blob.
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      status.textContent = "Review/rollback ZIP downloaded (" + result.bytes +
+      status.textContent = "Single-active review ZIP downloaded (" + result.bytes +
         " bytes, " + result.review_status + "). Remote was not modified.";
     } catch (error) {
       status.textContent = "Download failed: " + String(error.message || error) +

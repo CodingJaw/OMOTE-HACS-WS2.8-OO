@@ -74,7 +74,7 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("omote_manager/editor/export-kit", (ROOT / "release_ws.py").read_text())
         self.assertIn("build_deployment_kit", (ROOT / "release_model.py").read_text())
         self.assertIn("proposed", (ROOT / "release_model.py").read_text())
-        self.assertIn("rollback", (ROOT / "release_model.py").read_text())
+        self.assertIn("baseline", (ROOT / "release_model.py").read_text())
         backup_history = (ROOT / "backup_history.py").read_text()
         backup_ws = (ROOT / "backup_ws.py").read_text()
         workspace_js = (FRONTEND / "workspace-panel.js").read_text()
@@ -105,6 +105,15 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("async def storage_status", capability_api)
         self.assertIn("summarize_storage_status", (ROOT / "capability_model.py").read_text())
         self.assertIn("single-active", panel_js)
+        self.assertIn("register_reviewed_websockets",
+                      (ROOT / "workspace_ws.py").read_text())
+        self.assertIn("omote_manager/reviewed/retain",
+                      (ROOT / "reviewed_ws.py").read_text())
+        self.assertIn("studio-reviewed-load", (FRONTEND / "workspace-panel.js").read_text())
+        self.assertIn("se-retain-reviewed", (FRONTEND / "scene-editor.js").read_text())
+        self.assertIn("omote-config-generation-v1",
+                      (ROOT / "single_active_manifest.py").read_text())
+
         self.assertNotIn("Generation activation: DISABLED", panel_js)
         self.assertIn("recovery_required", panel_js)
 

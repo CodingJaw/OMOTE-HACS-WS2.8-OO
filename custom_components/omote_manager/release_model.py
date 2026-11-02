@@ -1,8 +1,8 @@
-"""Build a portable deployment-review/rollback kit without writing to OMOTE.
+"""Build a portable single-active review kit without writing to OMOTE.
 
 The archive deliberately contains two *separate full JSON snapshots*, not a
 flashable image or an auto-install script. This allows a human to inspect the
-draft and retain the last imported configuration as a recovery reference.
+draft and retain the originally imported baseline as a local reference.
 
 Only an administrator with an existing Home Assistant integration session can
 request the archive. No credentials from DeviceSettings/HaSettings are included.
@@ -17,25 +17,30 @@ import zipfile
 from typing import Any
 
 from .review_model import make_review
+from .single_active_manifest import build_canonical_json_manifest, referenced_images
 from .workspace_model import WorkspaceError, check_bundle_limits, file_digest
 
-BUNDLE_VERSION = "omote-manager-deployment-kit-v1"
+BUNDLE_VERSION = "omote-manager-single-active-review-kit-v2"
 MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 _WARNING = (
-    "THIS ARCHIVE IS NOT A FIRMWARE IMAGE AND IS NOT SAFE FOR AUTOMATED FLASHING.\n\n"
-    "Review proposed/ for the draft configuration and rollback/ for the\n"
-    "original JSON snapshot imported into Home Assistant.\n\n"
-    "Only approved OMOTE JSON configuration paths are included. This package\n"
-    "does NOT back up secrets, Wi-Fi credentials, HaSettings.json,\n"
-    "DeviceSettings.json, other assets, or the complete device filesystem.\n"
-    "Custom JSON files may still contain sensitive command data; protect\n"
-    "the downloaded archive accordingly.\n\n"
-    "The current omote-config-v1 firmware has unauthenticated, non-atomic\n"
-    "file writes, so OMOTE Manager intentionally does not deploy this ZIP.\n"
-    "Keep your previously working LittleFS image and firmware separately.\n"
-    "A 'verified' label only means changed files matched the earlier imported\n"
-    "snapshot at the time of the read; it does NOT guarantee future validity.\n"
+    "THIS ARCHIVE IS NOT FIRMWARE, NOT AN INSTALLER, AND CANNOT BE DEPLOYED.\n\n"
+    "proposed/ contains a reviewed HA JSON draft; baseline/ contains the\n"
+    "original imported JSON from that remote. baseline/ is NOT a device-side\n"
+    "automatic rollback generation and does not imply restore support.\n\n"
+    "When no image assets are referenced, GENERATION_MANIFEST_PREVIEW.json\n"
+    "contains exact canonical JSON manifest bytes for comparison with the\n"
+    "future firmware API. The manifest is NEVER sufficient for a safe deploy\n"
+    "without authenticated transport, device approval and hardware testing.\n"
+    "Any referenced images prevent canonical-manifest generation because\n"
+    "HACS currently stores safe JSON only, not image file bytes.\n\n"
+    "Private DeviceSettings/HaSettings and network/pairing credentials are\n"
+    "EXCLUDED. Custom JSON can still be sensitive; protect this ZIP.\n"
+    "A live remote-drift check is point-in-time and covers changed files,\n"
+    "not a proof that configuration is presently installed or complete.\n"
+    "To recover a broken device, use the firmware's independent recovery UI\n"
+    "and a separately reviewed secure re-send AFTER that API is implemented.\n"
 )
+
 
 
 def _zip_entry(path: str, data: bytes) -> zipfile.ZipInfo:
@@ -85,12 +90,23 @@ def build_deployment_kit(
         raise WorkspaceError("The remote has conflicting changes; archive export blocked")
 
     verified = bool(live.get("checked") and live.get("matches"))
+    unresolved_images = referenced_images(proposed)
+    canonical = None
+    canonical_sha256 = ""
+    if not unresolved_images:
+        canonical, canonical_sha256 = build_canonical_json_manifest(proposed)
     manifest = {
         "format": BUNDLE_VERSION,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "entry_id": remote_id,
         "deployable_by_current_integration": False,
-        "firmware_api": "omote-config-v1",
+        "firmware_api": "omote-config-v2-preview",
+        "storage_model": "single-active",
+        "automatic_rollback_supported": False,
+        "remote_write_enabled": False,
+        "canonical_manifest_included": canonical is not None,
+        "canonical_manifest_sha256": canonical_sha256,
+        "referenced_assets_not_included": unresolved_images,
         "review_status": "remote_verified_at_export" if verified else "offline_unverified",
         "remote_check_performed": bool(live.get("checked")),
         "remote_check_is_point_in_time": True,
@@ -99,7 +115,7 @@ def build_deployment_kit(
         "changed_files": expected["changed_files"],
         "changes": expected["changed_count"],
         "proposed_file_count": len(proposed),
-        "rollback_file_count": len(baseline),
+        "baseline_file_count": len(baseline),
         "secrets_and_non_json_assets_excluded": True,
         "instructions_file": "READ_ME_FIRST.txt",
     }
@@ -111,7 +127,12 @@ def build_deployment_kit(
     ) as archive:
         _append(archive, "READ_ME_FIRST.txt", _WARNING)
         _append(archive, "MANIFEST.json", json_manifest)
-        for prefix, files in (("proposed", proposed), ("rollback", baseline)):
+        if canonical is not None:
+            archive.writestr(
+                _zip_entry("GENERATION_MANIFEST_PREVIEW.json", canonical),
+                canonical,
+            )
+        for prefix, files in (("proposed", proposed), ("baseline", baseline)):
             for path, body in sorted(files.items()):
                 # check_bundle_limits has vetted all firmware paths. Do not
                 # create ZIP entries from arbitrary user-provided absolute paths.
