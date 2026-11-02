@@ -52,7 +52,7 @@ def make_review(draft: dict[str, str], imported: dict[str, str]) -> dict[str, An
         reasons.append(f"Draft validation has {errors} error(s)")
     reasons.append(
         "Firmware deployment remains disabled until authenticated, "
-        "transactional writes, verified commit and rollback are supported"
+        "single-active transactions and independent recovery are hardware-tested"
     )
     return {
         "changed_files": changed,

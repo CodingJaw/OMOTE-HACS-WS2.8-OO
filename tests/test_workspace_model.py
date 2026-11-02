@@ -130,6 +130,28 @@ class TestJsonModel(unittest.TestCase):
         issues = model.validate_bundle(files)
         self.assertTrue(any("Pages/TV.json" in x["message"] for x in issues))
 
+    def test_duplicate_scene_files_rejected(self):
+        files = sample_bundle()
+        scenes = model.parse_jsonc(files["Scenes.json"])
+        scenes["Scenes"].append(dict(scenes["Scenes"][0]))
+        files["Scenes.json"] = model.dump_json(scenes)
+        issues = model.validate_bundle(files)
+        self.assertTrue(any(
+            item["level"] == "error" and "Duplicate scene file" in item["message"]
+            for item in issues
+        ))
+
+    def test_image_widgets_warn_about_missing_binary_assets(self):
+        files = sample_bundle()
+        page = model.parse_jsonc(files["Pages/TV.json"])
+        page["Widgets"].append({"Type": "Image", "ImageFile": "Images/room.png"})
+        files["Pages/TV.json"] = model.dump_json(page)
+        issues = model.validate_bundle(files)
+        self.assertTrue(any(
+            item["level"] == "warning" and "Image widget assets" in item["message"]
+            for item in issues
+        ))
+
     def test_edit_command_preserves_other_files_and_unknown_keys(self):
         files = sample_bundle()
         edited = model.edit_command(

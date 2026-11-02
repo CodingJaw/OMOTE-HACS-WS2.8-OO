@@ -1,4 +1,4 @@
-"""Build a portable deployment-review/rollback kit without writing to OMOTE.
+"""Build a single-active reviewed configuration and imported-baseline ZIP.
 
 The archive deliberately contains two *separate full JSON snapshots*, not a
 flashable image or an auto-install script. This allows a human to inspect the
@@ -18,23 +18,24 @@ from typing import Any
 
 from .review_model import make_review
 from .workspace_model import WorkspaceError, check_bundle_limits, file_digest
+from .portable_manifest import make_portable_index
 
-BUNDLE_VERSION = "omote-manager-deployment-kit-v1"
+BUNDLE_VERSION = "omote-manager-single-active-review-v2"
 MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 _WARNING = (
-    "THIS ARCHIVE IS NOT A FIRMWARE IMAGE AND IS NOT SAFE FOR AUTOMATED FLASHING.\n\n"
-    "Review proposed/ for the draft configuration and rollback/ for the\n"
-    "original JSON snapshot imported into Home Assistant.\n\n"
-    "Only approved OMOTE JSON configuration paths are included. This package\n"
-    "does NOT back up secrets, Wi-Fi credentials, HaSettings.json,\n"
-    "DeviceSettings.json, other assets, or the complete device filesystem.\n"
-    "Custom JSON files may still contain sensitive command data; protect\n"
-    "the downloaded archive accordingly.\n\n"
-    "The current omote-config-v1 firmware has unauthenticated, non-atomic\n"
-    "file writes, so OMOTE Manager intentionally does not deploy this ZIP.\n"
-    "Keep your previously working LittleFS image and firmware separately.\n"
-    "A 'verified' label only means changed files matched the earlier imported\n"
-    "snapshot at the time of the read; it does NOT guarantee future validity.\n"
+    "OFFLINE REVIEW ONLY. NOT A FIRMWARE IMAGE OR A DEPLOYMENT PACKAGE.\n\n"
+    "proposed/ contains the locally reviewed Home Assistant JSON draft.\n"
+    "imported-baseline/ contains the JSON imported from the remote before edits.\n"
+    "PORTABLE_INDEX.json contains per-file SHA-256 and exact byte lengths.\n\n"
+    "OMOTE uses ONE active configuration; there is no A/B configuration or\n"
+    "automatic rollback. Home Assistant may eventually resend a reviewed copy\n"
+    "only through a future authenticated, touchscreen-approved transaction API.\n"
+    "No firmware writes or recovery operations are included in this ZIP.\n\n"
+    "Wi-Fi/NVS credentials, device-specific private settings, image assets and\n"
+    "other non-JSON files are EXCLUDED. This is not a complete device backup or\n"
+    "a firmware-ready manifest. User JSON can contain sensitive command data.\n"
+    "Protect this archive and retain your verified full-flash backup separately.\n"
+    "A remote drift check is only a point-in-time comparison.\n"
 )
 
 
@@ -58,7 +59,7 @@ def build_deployment_kit(
     *,
     remote_id: str,
 ) -> bytes:
-    """Create a portable proposal + rollback ZIP from immutable HA snapshots.
+    """Create a JSON-only proposal + imported-baseline ZIP from HA snapshots.
 
     If the validation, hash, or live-drift review is stale or conflicted, raise
     WorkspaceError rather than returning a potentially misleading bundle.
@@ -90,7 +91,9 @@ def build_deployment_kit(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "entry_id": remote_id,
         "deployable_by_current_integration": False,
-        "firmware_api": "omote-config-v1",
+        "storage_model": "single-active",
+        "automatic_rollback": False,
+        "firmware_api": "read-only-v1-or-v2-preview",
         "review_status": "remote_verified_at_export" if verified else "offline_unverified",
         "remote_check_performed": bool(live.get("checked")),
         "remote_check_is_point_in_time": True,
@@ -99,7 +102,9 @@ def build_deployment_kit(
         "changed_files": expected["changed_files"],
         "changes": expected["changed_count"],
         "proposed_file_count": len(proposed),
-        "rollback_file_count": len(baseline),
+        "imported_baseline_file_count": len(baseline),
+        "complete_for_firmware_deployment": False,
+        "portable_index_file": "PORTABLE_INDEX.json",
         "secrets_and_non_json_assets_excluded": True,
         "instructions_file": "READ_ME_FIRST.txt",
     }
@@ -111,7 +116,12 @@ def build_deployment_kit(
     ) as archive:
         _append(archive, "READ_ME_FIRST.txt", _WARNING)
         _append(archive, "MANIFEST.json", json_manifest)
-        for prefix, files in (("proposed", proposed), ("rollback", baseline)):
+        _append(
+            archive, "PORTABLE_INDEX.json",
+            json.dumps(make_portable_index(proposed), sort_keys=True,
+                       separators=(",", ":"), ensure_ascii=False) + "\n",
+        )
+        for prefix, files in (("proposed", proposed), ("imported-baseline", baseline)):
             for path, body in sorted(files.items()):
                 # check_bundle_limits has vetted all firmware paths. Do not
                 # create ZIP entries from arbitrary user-provided absolute paths.

@@ -185,7 +185,7 @@
   .se-diff-legend span { font-size: 10px; padding: 5px 7px; }
 }
 
-/* Export package is only an offline proposal/rollback reference, not flashing. */
+/* Offline proposal/imported-baseline review; firmware writes remain disabled. */
 .se-kit-export {
   margin-top: 16px;
   border: 1px solid var(--divider-color, #d7e1ed);
@@ -224,3 +224,11 @@
   color: var(--secondary-text-color, #667788);
 }
 #se-kit-status:empty { display: none; }
+
+#se-reviewed-status, #se-recovery-status {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  color: var(--secondary-text-color, #667788);
+}

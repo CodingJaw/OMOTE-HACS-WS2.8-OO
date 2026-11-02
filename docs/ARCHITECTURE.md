@@ -100,3 +100,41 @@ responses fail closed. The sidebar shows capacity/selector diagnostics but
 never enables a deployment operation, regardless of any remote-reported
 `generation_activation_enabled` value. The firmware does not write or
 initialize NVS while serving the diagnostic request.
+
+## Feature branch dev15 — single-active HACS-only review and recovery
+
+The user's November 1, 2026 decision **supersedes all earlier A/B and
+automatic-rollback proposals in this document**. The authoritative contract
+is [DEPLOYMENT_PROTOCOL.md](DEPLOYMENT_PROTOCOL.md). No stable branch or
+firmware is modified by these feature-branch changes.
+
+- The read-only capability parser accepts older v2-preview fields but no
+  longer requires `previous_revision_sha256`, `rollback_support`, or
+  deprecated NVS selector flags. It never authorizes writes.
+- The storage inspector normalizes `single-active` / `legacy|active|recovery`,
+  validates revision SHA-256 and recovery consistency, and shows the current
+  mode and independent recovery warning.
+- Profile Studio has a manual **Check recovery state** action. It does not
+  send, pair, reboot or upload anything.
+- `WorkspaceStore` schema 1 now has an optional `reviewed` map, one
+  SHA-256-checked reviewed JSON-only copy per entry. Older schema 1 records
+  load with an empty map. The reviewed copy survives draft reimports and
+  is independent of `OmoteBackupHistory`'s three imported snapshots.
+  WebSocket `omote_manager/editor/save-reviewed` is admin-only, validates
+  current workspace revision and draft hash, reruns optional live drift
+  checks, and persists only to HA private storage. Metadata returned to
+  the UI contains no JSON bodies or private device settings.
+- Offline review ZIP v2 uses `proposed/`, `imported-baseline/` and
+  `PORTABLE_INDEX.json`. Per-file SHA-256 is computed over exact UTF-8
+  bytes; index order is deterministic. **Not a firmware-ready canonical
+  manifest**: image assets, private settings, secure session and activation
+  protocol are not present. It must never be used for a manual flash.
+- The server-side deployment kill switch remains false. Future pairing,
+  upload, touchscreen approval and manual recovery resend must not be
+  implemented against unauthenticated v1 routes.
+
+Testing: pure-model and HA storage stub regressions cover legacy migration,
+reviewed snapshot persistence and integrity, invalid mode/flags, duplicate
+scenes, missing binary asset warnings, and portable index ordering. The
+GitHub workflow runs the complete Python unittest suite and JavaScript
+syntax checks on the draft pull request.

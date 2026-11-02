@@ -1,4 +1,4 @@
-"""Offline deployment-kit archive verification and rollback-package tests."""
+"""Offline single-active review archive and imported-baseline tests."""
 from __future__ import annotations
 
 from io import BytesIO
@@ -29,6 +29,7 @@ load("const")
 load("safe_files")
 model = load("workspace_model")
 review = load("review_model")
+portable = load("portable_manifest")
 release = load("release_model")
 
 
@@ -73,11 +74,12 @@ class TestReleaseArchive(unittest.TestCase):
             names = set(package.namelist())
             self.assertIn("READ_ME_FIRST.txt", names)
             self.assertIn("MANIFEST.json", names)
+            self.assertIn("PORTABLE_INDEX.json", names)
             for path in original:
-                self.assertIn("rollback/" + path, names)
+                self.assertIn("imported-baseline/" + path, names)
                 self.assertIn("proposed/" + path, names)
                 self.assertEqual(
-                    package.read("rollback/" + path), original[path].encode()
+                    package.read("imported-baseline/" + path), original[path].encode()
                 )
                 self.assertEqual(
                     package.read("proposed/" + path), proposal[path].encode()
@@ -86,14 +88,25 @@ class TestReleaseArchive(unittest.TestCase):
             manifest = json.loads(package.read("MANIFEST.json"))
             self.assertEqual(manifest["format"], release.BUNDLE_VERSION)
             self.assertEqual(manifest["changes"], 1)
+            self.assertEqual(manifest["storage_model"], "single-active")
+            self.assertFalse(manifest["automatic_rollback"])
+            self.assertFalse(manifest["complete_for_firmware_deployment"])
+            index = json.loads(package.read("PORTABLE_INDEX.json"))
+            self.assertEqual(index["file_count"], 4)
+            self.assertFalse(index["deployment_enabled"])
+            self.assertFalse(index["image_assets_included"])
+            self.assertEqual(
+                [item["path"] for item in index["files"]],
+                sorted(original),
+            )
             self.assertEqual(manifest["entry_id"], "test-entry-id")
             self.assertEqual(manifest["review_status"], "offline_unverified")
             self.assertFalse(manifest["deployable_by_current_integration"])
             self.assertEqual(
                 manifest["draft_sha256"], model.file_digest(proposal)
             )
-            self.assertEqual(manifest["rollback_file_count"], 4)
-            self.assertIn("not safe for automated flashing",
+            self.assertEqual(manifest["imported_baseline_file_count"], 4)
+            self.assertIn("not a firmware image",
                           package.read("READ_ME_FIRST.txt").decode().lower())
 
     def test_verified_archive_tag_only_after_read_only_remote_check(self):

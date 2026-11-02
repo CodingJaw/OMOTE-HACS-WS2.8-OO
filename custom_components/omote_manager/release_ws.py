@@ -1,4 +1,4 @@
-"""Admin-only read-only deployment kit ZIP download over Home Assistant WebSocket.
+"""Admin-only HA review retention and offline ZIP download over WebSocket.
 
 This module deliberately exposes no device configuration write methods. The
 firmware's current /api/fs/write truncates live LittleFS files and has no
@@ -70,7 +70,7 @@ async def _remote_preflight(
 )
 @websocket_api.async_response
 async def ws_export_kit(hass: HomeAssistant, connection, msg: dict) -> None:
-    """Package a validated, unchanged HA draft plus its rollback baseline."""
+    """Package a validated, unchanged HA draft plus its imported baseline."""
     if not _admin(connection, msg):
         return
     store: WorkspaceStore = hass.data[STORE_KEY]
@@ -127,7 +127,7 @@ async def ws_export_kit(hass: HomeAssistant, connection, msg: dict) -> None:
         return
 
     connection.send_result(msg["id"], {
-        "filename": "omote-deployment-review-kit.zip",
+        "filename": "omote-single-active-review.zip",
         "mime_type": "application/zip",
         "base64": base64.b64encode(zipbytes).decode("ascii"),
         "zip_sha256": hashlib.sha256(zipbytes).hexdigest(),
@@ -141,5 +141,55 @@ async def ws_export_kit(hass: HomeAssistant, connection, msg: dict) -> None:
     })
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "omote_manager/editor/save-reviewed",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): _REVISION,
+        vol.Required("draft_sha256"): _SHA256,
+        vol.Optional("check_live", default=True): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_save_reviewed(hass: HomeAssistant, connection, msg: dict) -> None:
+    """Persist a reviewed snapshot in HA only, with a fresh optional drift check."""
+    if not _admin(connection, msg):
+        return
+    store: WorkspaceStore = hass.data[STORE_KEY]
+    try:
+        report, _, _, originals = store.release_snapshot(msg["entry_id"])
+        if report["revision"] != msg["revision"]:
+            raise WorkspaceError("Workspace changed; run review again")
+        if report["draft_sha256"] != msg["draft_sha256"]:
+            raise WorkspaceError("Draft changed; run review again")
+        if report["errors"] or not report["changed_count"]:
+            raise WorkspaceError("Fix validation errors and review changed files")
+        if msg["check_live"]:
+            try:
+                report = await _remote_preflight(
+                    hass, msg["entry_id"], report, originals
+                )
+            except OmoteApiError:
+                connection.send_error(
+                    msg["id"], websocket_api.ERR_UNKNOWN_ERROR,
+                    "Remote drift check failed; retry or choose offline review",
+                )
+                return
+            if report["live_check"]["matches"] is not True:
+                raise WorkspaceError("Remote drift or stale draft; run review again")
+        metadata = await store.async_save_reviewed(
+            msg["revision"], msg["entry_id"], msg["draft_sha256"],
+            live_checked=msg["check_live"],
+        )
+    except WorkspaceError as exc:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(exc))
+        return
+    response = store.summary()
+    response["reviewed_saved"] = metadata
+    response["deployment_enabled"] = False
+    connection.send_result(msg["id"], response)
+
+
 def register_release_websockets(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_export_kit)
+    websocket_api.async_register_command(hass, ws_save_reviewed)
