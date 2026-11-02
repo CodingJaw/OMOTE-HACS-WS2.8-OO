@@ -110,6 +110,7 @@ class SceneEditor {
       '    independently of your three historical backups. A newer review replaces',
       '    only the previous reviewed copy; the remote is never modified.</p></div>',
       '  <button type="button" id="se-save-reviewed" disabled>Save reviewed copy in HA</button>',
+      '  <button type="button" id="se-load-reviewed" disabled>Load reviewed copy into draft</button>',
       '</div>',
       '<p id="se-reviewed-status" role="status" aria-live="polite"></p>',
       '<div class="se-kit-export">',
@@ -168,6 +169,7 @@ class SceneEditor {
     this.ui("se-review-run").addEventListener("click", () => void this.runReview());
     this.ui("se-kit-download").addEventListener("click", () => void this.downloadKit());
     this.ui("se-save-reviewed").addEventListener("click", () => void this.saveReviewed());
+    this.ui("se-load-reviewed").addEventListener("click", () => void this.loadReviewed());
     this.ui("se-recovery-check").addEventListener("click", () => void this.checkRecovery());
     this.ui("se-review-check-live").addEventListener("change", () => {
       this.clearReview("Review preference changed. Run review again before downloading.");
@@ -269,6 +271,7 @@ class SceneEditor {
   renderReviewed() {
     const record = this.studio.data?.reviewed?.[this.entryId];
     const status = this.ui("se-reviewed-status");
+    this.ui("se-load-reviewed").disabled = !record || record.integrity !== "verified";
     if (!record) {
       status.textContent = "No reviewed configuration retained for this remote.";
     } else if (record.integrity !== "verified") {
@@ -727,6 +730,29 @@ class SceneEditor {
         "Unable to retain review: " + String(error.message || error);
     } finally {
       button.disabled = !this.reviewSaveValid;
+    }
+  }
+
+  async loadReviewed() {
+    const entry = this.entryId;
+    const record = this.studio.data?.reviewed?.[entry];
+    if (!entry || !record || record.integrity !== "verified") return;
+    if (!window.confirm(
+      "Replace the current Home Assistant draft with the saved reviewed " +
+      "configuration (" + record.sha256.slice(0, 12) + "…)? " +
+      "Unsent draft edits will be lost. The retained reviewed copy and " +
+      "backup history remain intact. Nothing will be sent to the Waveshare."
+    )) return;
+    const ok = await this.studio.change({
+      type: "omote_manager/editor/load-reviewed",
+      entry_id: entry,
+      reviewed_sha256: record.sha256,
+      replace: true
+    }, "Reviewed configuration loaded into HA draft. Remote not modified.");
+    if (ok && entry === this.entryId) {
+      this.onRemoteChanged();
+      this.clearReview("Reviewed copy loaded into HA draft. Run a fresh review.");
+      this.renderReviewed();
     }
   }
 

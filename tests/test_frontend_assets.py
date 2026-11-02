@@ -78,6 +78,8 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("PORTABLE_INDEX.json", (ROOT / "release_model.py").read_text())
         self.assertIn("ws_save_reviewed", (ROOT / "release_ws.py").read_text())
         self.assertIn("se-save-reviewed", diff_view)
+        self.assertIn("se-load-reviewed", diff_view)
+        self.assertIn("ws_load_reviewed", (ROOT / "release_ws.py").read_text())
         self.assertIn("se-recovery-check", diff_view)
         self.assertIn("async_save_reviewed", (ROOT / "workspace_store.py").read_text())
         backup_history = (ROOT / "backup_history.py").read_text()

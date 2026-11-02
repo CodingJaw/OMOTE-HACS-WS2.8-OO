@@ -509,6 +509,22 @@ class WorkspaceStore:
             raise WorkspaceError("Reviewed configuration is damaged")
         return deepcopy(record["files"])
 
+    async def async_load_reviewed_to_draft(
+        self, expected_revision: int, entry_id: str,
+        expected_sha256: str, *, replace: bool = False,
+    ) -> None:
+        """Explicitly restore retained JSON into a HA draft, never to firmware.
+
+        The reviewed snapshot remains immutable and independent of the draft
+        even after replacement. A hash and revision prevent stale UI actions.
+        """
+        files = self.reviewed_snapshot(entry_id)
+        if file_digest(files) != expected_sha256:
+            raise WorkspaceError("Reviewed configuration changed; refresh first")
+        await self.async_import(
+            expected_revision, entry_id, files, replace=replace,
+        )
+
     def diff(self, entry_id: str, path: str | None = None) -> dict[str, Any]:
         """Inspect local draft changes without exposing other configuration."""
         draft = self._state["drafts"].get(entry_id)

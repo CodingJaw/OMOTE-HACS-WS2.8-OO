@@ -190,6 +190,35 @@ async def ws_save_reviewed(hass: HomeAssistant, connection, msg: dict) -> None:
     connection.send_result(msg["id"], response)
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "omote_manager/editor/load-reviewed",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): _REVISION,
+        vol.Required("reviewed_sha256"): _SHA256,
+        vol.Optional("replace", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_load_reviewed(hass: HomeAssistant, connection, msg: dict) -> None:
+    """Restore reviewed JSON to HA workspace only; no remote reads or writes."""
+    if not _admin(connection, msg):
+        return
+    store: WorkspaceStore = hass.data[STORE_KEY]
+    try:
+        await store.async_load_reviewed_to_draft(
+            msg["revision"], msg["entry_id"], msg["reviewed_sha256"],
+            replace=msg["replace"],
+        )
+    except WorkspaceError as exc:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(exc))
+        return
+    response = store.summary()
+    response["deployment_enabled"] = False
+    connection.send_result(msg["id"], response)
+
+
 def register_release_websockets(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_export_kit)
     websocket_api.async_register_command(hass, ws_save_reviewed)
+    websocket_api.async_register_command(hass, ws_load_reviewed)

@@ -117,6 +117,27 @@ class TestRetainedReviewed(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(meta["review_status"], "offline-unverified")
         self.assertFalse(meta["review_status"] == "remote-checked")
 
+    async def test_manual_load_reviewed_only_replaces_ha_draft(self):
+        sha = model.file_digest(edited())
+        await self.store.async_save_reviewed(
+            2, "remote-1", sha, live_checked=True
+        )
+        await self.store.async_import(3, "remote-1", original(), replace=True)
+        with self.assertRaisesRegex(model.WorkspaceError, "changed"):
+            await self.store.async_load_reviewed_to_draft(
+                4, "remote-1", "f" * 64, replace=True
+            )
+        with self.assertRaisesRegex(model.WorkspaceError, "already exists"):
+            await self.store.async_load_reviewed_to_draft(
+                4, "remote-1", sha, replace=False
+            )
+        await self.store.async_load_reviewed_to_draft(
+            4, "remote-1", sha, replace=True
+        )
+        self.assertEqual(self.store.summary()["drafts"]["remote-1"]["current_sha256"], sha)
+        self.assertEqual(self.store.reviewed_snapshot("remote-1"), edited())
+        self.assertEqual(self.store.summary()["reviewed"]["remote-1"]["integrity"], "verified")
+
     async def test_corrupt_review_fails_closed(self):
         await self.store.async_save_reviewed(
             2, "remote-1", model.file_digest(edited()), live_checked=True
