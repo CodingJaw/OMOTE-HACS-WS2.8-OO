@@ -333,6 +333,14 @@ class OmoteApi:
         )
 
     async def read_image_asset(self, path: str) -> bytes:
+        """Bound the entire transfer, including fallback and post-read stat."""
+        try:
+            async with asyncio.timeout(90):
+                return await self._read_image_asset_bounded(path)
+        except TimeoutError as exc:
+            raise OmoteApiError("Image asset transfer timed out") from exc
+
+    async def _read_image_asset_bounded(self, path: str) -> bytes:
         """Read one public PNG/JPEG using bounded binary transport.
 
         No partial data is returned. The remote's legacy stat API supplies
