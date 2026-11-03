@@ -1,68 +1,51 @@
-# OMOTE HACS — operational branch and release policy
+# OMOTE HACS — active-main development and preserved releases
 
-**User-confirmed rule (2026-11-03): HACS currently installs and works only from `main`.**
-A passing CI build on a feature branch is **not** evidence that Home Assistant
-can install, load or use that branch. Never ask the operator to switch HACS
-directly to an untested feature branch as a substitute for acceptance testing.
+**Confirmed operator workflow (2026-11-03): HACS installs and updates the integration from `main`; do not rely on installing feature branches.** Therefore `main` is the **active development and HACS distribution branch**, not a frozen stable release.
 
-## Preserved refs (verified via GitHub compare on 2026-11-03)
+## Branch roles
 
-| Ref | Role | Baseline | May experimental work modify it? |
-| --- | --- | --- | --- |
-| `main` | Only currently confirmed HACS installation/update source | `13a94cf0bd7f2e03cfca3210fd10435bd101578e` (`dev17`) | **No** |
-| `verified-dev17` | Immutable known-good release reference | Same exact commit as `main` on 2026-11-03 | **No** |
-| `working` | Older `dev14` fallback | Separate older snapshot; seven commits behind `main` | **No** |
-| `develop` | Historical development reference | Not an HA acceptance target | Avoid without explicit request |
-| `feature/usb-recovery-assets-phase` | Current HACS asset/security experimental work | Based on `main`, ahead; not installed in production | **Yes** |
-| Other `feature/*` | Earlier or alternative drafts | May overlap; review before combining | Only by explicit scope |
+| Branch | Purpose | Policy |
+| --- | --- | --- |
+| `main` | **Active HACS development, installation and update source** | Commit tested integration updates here; each update is visible to HACS |
+| `stable/verified-dev17-before-v2` | Exact known-good `dev17` snapshot, `13a94cf0bd7f2e03cfca3210fd10435bd101578e` | Preserve unchanged |
+| `verified-dev17` | Additional known-good `dev17` snapshot, same commit | Preserve unchanged |
+| `working` | Older `dev14` fallback, `3f801ad96371d4a277430aaaac99791233e18050` | Preserve unchanged |
+| `develop` | Historical older branch | Not the HACS install source |
+| `feature/*` | Optional staging for risky or concurrent work | Consolidate accepted, passing code into `main`; do not require HACS to install from it |
 
-The matching OMOTE firmware development branch is
-`CodingJaw/OMOTE-Firmware-WS2.8-OO:feature/config-v2-transactional`.
-The stable, previously working firmware branch `waveshare28v2-port` must not
-be changed by these experiments.
+The firmware project has its own separate rules. Continue experimental firmware
+work on `CodingJaw/OMOTE-Firmware-WS2.8-OO:feature/config-v2-transactional`.
+Do **not** change firmware `waveshare28v2-port` or enable deployment.
 
-## Operational rules
+## Update process for HACS
 
-1. **Never push, force-push, rebase, merge into, delete, or reset** HACS
-   `main`, `working`, or `verified-dev17` as part of experimental work.
-   Never change the connected production HACS installation without the
-   operator's explicit approval and a known restore path.
-2. Use an existing appropriately named HACS `feature/*` branch (or a new
-   feature branch based on `main`) for proposed changes. Keep changes
-   reviewable and run HA 2024.9.1-compatible unit/contract/JS/JSON tests.
-3. Preserve the server-side deployment **kill switch OFF** and leave v1
-   writes, unauthenticated pairing, direct file mutation, and firmware
-   transactions unreachable until verified secure firmware support, independent
-   recovery and actual Waveshare testing pass.
-4. A proposed release must include: exact Git commit, tested HA Core/HACS
-   versions, CI links, a diff against `verified-dev17`, firmware API and
-   migration compatibility review, and explicit rollback instructions.
-5. User acceptance testing of the updated **actual main-branch HACS install**
-   is necessary to call the update supported. To avoid risking the only
-   working installation, first test in a **separate HA test instance**, where
-   the candidate code can be installed independently. Do not merge or switch
-   production `main` just to find out whether it loads.
-6. When the candidate passes all gates, ask the operator for specific
-   authorization **before** promotion to `main`. First preserve a fresh
-   immutable candidate/release ref and the current `main` SHA. Merge only
-   the approved release commit(s), never merge competing draft PRs blindly.
-7. After promotion, verify installation from `main`, config flow, sidebar,
-   remote discovery, read-only import, backup/review workflows, reconnect,
-   and recovery-safe behavior in the target Home Assistant version. If any
-   step fails, restore the earlier release from an immutable ref under
-   operator direction; do not silently deploy a different branch.
+1. Start from the latest `main`. When making a risky change, preserve the
+   current good commit in a new named `stable/*` branch **before updating main**.
+2. Develop and land HACS changes in `main`. Feature branches may be used
+   temporarily for safety or concurrency, but are **not** the installation path.
+3. Every update must pass Python, JavaScript, JSON and cross-repository API
+   contract checks; preserve HA Core 2024.9.1/HACS 2.0.5 compatibility.
+4. Increment the integration manifest version and the frontend module/cache
+   version together, to make HACS update detection and browser cache
+   invalidation reliable. Version changes must satisfy
+   `tests/test_frontend_assets.py`.
+5. HACS users update/reinstall from the normal **main/default branch** source.
+   After update, validate config flow, panel, import, backups and reconnect on
+   the actual Home Assistant installation. A CI pass does **not** prove HA
+   acceptance.
+6. If the latest main build fails installation, preserve forensic details,
+   restore the last-good snapshot to `main` under the operator's direction,
+   and issue an updated manifest version. Do not delete the stable snapshots.
+7. Keep firmware configuration mutations and pairing **OFF** until secure
+   transactions, touchscreen approvals, independent recovery and physical
+   Waveshare tests have been proven; HACS main code must remain safe for
+   read-only installation in the meantime.
 
-## Branch protection limitation
+## Branch protection
 
-This document is process policy, **not technical GitHub branch protection**.
-The connected GitHub integration currently receives HTTP 403 for reading
-`main` branch protection and cannot configure or verify rulesets.
-
-For an enforceable release gate, a repository administrator should configure
-GitHub Settings → Rules → Rulesets (or Branch protection) for `main`:
-require a pull request and passing HACS validation checks; restrict direct
-pushes/force pushes/deletion, require deliberate reviewer approval, and
-restrict bypass permissions as appropriate. Also protect the saved
-`working` and `verified-dev17` refs from deletion or rewriting.
-
-No GitHub protection change is claimed until confirmed in repository settings.
+This workflow intentionally permits reviewed development on `main`; do not
+configure GitHub rules that prevent all main-branch development. If rulesets
+are desired, require passing checks before merges and prohibit force-pushes
+and deletion on `main` and saved `stable/*` branches. The connected
+GitHub integration cannot configure or verify rulesets (HTTP 403); this
+document is **process guidance**, not a claim of technical protection.
