@@ -4,7 +4,7 @@ A HACS custom integration for [OMOTE object-oriented firmware](https://github.co
 
 **Development build 0.1.0-dev17 — Home Assistant drafts and reviewed snapshots; all device deployments remain disabled.**
 
-**Branch policy:** `main` is the HACS development/update branch. The last known-good HACS version (v0.1.0-dev14) is preserved on the `working` branch, and `develop` remains at that older commit. To return to the known-good release, restore the `working` tree to `main` and redownload in HACS. The stable OMOTE firmware branch is unaffected.
+**Branch policy (2026-11-03):** The current Home Assistant HACS installation is verified to work **only from `main`** (`v0.1.0-dev17`). `verified-dev17` preserves the identical known-good commit and `working` remains the older dev14 fallback. All new HACS work stays in isolated `feature/*` branches. Do **not** merge development into `main`, switch the installed production HACS source, or enable firmware deployment without explicit approval and real HA acceptance testing. See [branch and release policy](docs/BRANCH_AND_RELEASE_POLICY.md). The stable OMOTE firmware branch is unaffected.
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
