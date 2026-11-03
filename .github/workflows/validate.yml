@@ -1,8 +1,11 @@
 name: Validate integration
 on:
   push:
-    branches: [develop, main]
+    branches: [develop, main, 'feature/**']
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   static:
     runs-on: ubuntu-latest
