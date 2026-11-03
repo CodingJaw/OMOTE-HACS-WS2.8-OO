@@ -2,13 +2,13 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Feature-branch build 0.1.0-dev16 — Home Assistant drafts and reviewed snapshots; all device deployments remain disabled.**
+**Development build 0.1.0-dev18 — HACS main-branch updates, read-only firmware API hardening and binary-image retrieval groundwork; firmware deployments remain disabled.**
 
-This is an isolated feature branch, **not** a published HACS update. The existing `main` and `develop` branches remain on their prior tested release.
+**Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
-## Single-active feature branch (not deployed)
+## Single-active HACS development (device deployment disabled)
 
 The firmware issue was revised on **November 1, 2026**: **one active
 configuration, no managed A/B generations and no automatic device rollback**.
@@ -16,7 +16,7 @@ A device with a broken active configuration must boot a firmware-owned local
 recovery screen and securely accept an independently authorized re-send from
 Home Assistant when its network is available.
 
-This feature branch provides:
+This development version provides:
 
 - **Retained reviewed configuration:** Profile Studio can explicitly preserve
   a locally validated, SHA-256-checked JSON draft in HA private storage.
@@ -43,6 +43,26 @@ This feature branch provides:
 
 This branch does not add any POST/PUT/DELETE firmware calls, enable a
 deployment button, or change the stable firmware branch.
+
+## Development update through HACS
+
+This repository deliberately uses **`main` as the active HACS development branch**.
+For the installed custom repository, use **HACS → OMOTE Manager → Redownload**
+(or install the offered update) and restart Home Assistant. The code is not
+automatically hot-reloaded; use a browser hard refresh (Ctrl+Shift+R) to
+discard stale frontend modules. Existing Home Assistant configuration,
+drafts and backups are retained in HA private storage.
+
+The preserved `working` branch contains the last-known-good dev14 code.
+HACS cannot directly select an arbitrary branch through the standard version
+selector, so fallback is performed by restoring that commit's tree to
+`main`, then redownloading. This is not an automatic failover.
+No firmware update or remote write is included.
+
+The v0.1.0-dev17 feature set adds a **read-only** PNG/JPEG dependency inventory
+and USB recovery preparation. It does not yet capture complete image
+binaries into HACS backups or support image uploads. Deployment remains
+hard-disabled.
 
 ## Compatibility baseline
 
@@ -182,7 +202,7 @@ The firmware mDNS service advertises `id=<12-digit device MAC hex>`, `api=omote-
 
 Your security decisions are binding: initial pairing requires a touchscreen one-time code, and **every individual deployment must subsequently require both HA administrator confirmation and a fresh local touchscreen approval on the target remote**. All v1 and v2 preview firmware stays non-deployable in HACS. See [HACS v2 deployment issue](https://github.com/CodingJaw/OMOTE-HACS-WS2.8-OO/issues/2) and [firmware issue](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/issues/1).
 
-### LittleFS and boot-selector diagnostics (v0.1.0-dev14)
+### LittleFS and boot-selector diagnostics
 
 The **Check firmware safety** button on the OMOTE Manager Overview now also reads
 `GET /api/config/v2/storage/status` when the experimental firmware advertises
@@ -199,7 +219,7 @@ or rollback becomes enabled**.
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev14, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev18, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 

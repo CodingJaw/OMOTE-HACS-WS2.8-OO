@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "id": "omote-config-v2-preview-read-only",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "firmware_branch": "feature/config-v2-transactional",
+  "active_storage_model": "single-active",
+  "deployment_authorized": false,
+  "notes": "Static source/HA compatibility baseline only. Not proof of cryptographic pairing, live device behavior or write-safe commits.",
+  "preview_capabilities": {
+    "api_version": "omote-config-v2-preview",
+    "auth_mode": "not-implemented",
+    "device_id": "",
+    "firmware_build": "waveshare28v2-config-v2-preview",
+    "max_file_bytes": 0,
+    "max_transaction_bytes": 0,
+    "available_staging_bytes": 0,
+    "active_revision_sha256": "",
+    "previous_revision_sha256": "",
+    "transaction_support": false,
+    "rollback_support": false,
+    "write_protection_enabled": true,
+    "legacy_http_writes_disabled": true
+  },
+  "read_only_routes": {
+    "/api/status": "handleStatus",
+    "/api/config/v2/capabilities": "handleV2CapabilitiesPreview",
+    "/api/config/v2/storage/status": "handleV2StorageStatus",
+    "/api/fs/tree": "handleFsTree",
+    "/api/fs/stat": "handleFsStat",
+    "/api/fs/read/raw": "handleFsReadRaw",
+    "/api/fs/read/chunk": "handleFsReadChunk"
+  },
+  "blocked_mutations": [
+    {
+      "method": "HTTP_POST",
+      "path": "/api/fs/write"
+    },
+    {
+      "method": "HTTP_PUT",
+      "path": "/api/fs/write"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/fs/delete"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/device/reboot"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/device/settings"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/device/sync-mode"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/ir/learn/start"
+    },
+    {
+      "method": "HTTP_POST",
+      "path": "/api/ir/learn/stop"
+    }
+  ],
+  "storage_samples": [
+    {
+      "storage": "littlefs",
+      "storage_model": "single-active",
+      "config_mode": "legacy",
+      "recovery_required": false,
+      "recovery_reason": "",
+      "active_revision_sha256": "",
+      "total_bytes": 6000000,
+      "used_bytes": 2000000,
+      "estimated_free_bytes": 4000000
+    },
+    {
+      "storage": "littlefs",
+      "storage_model": "single-active",
+      "config_mode": "active",
+      "recovery_required": false,
+      "recovery_reason": "",
+      "active_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "total_bytes": 6000000,
+      "used_bytes": 2000000,
+      "estimated_free_bytes": 4000000
+    },
+    {
+      "storage": "littlefs",
+      "storage_model": "single-active",
+      "config_mode": "recovery",
+      "recovery_required": true,
+      "recovery_reason": "active-graph-invalid",
+      "active_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "total_bytes": 6000000,
+      "used_bytes": 2000000,
+      "estimated_free_bytes": 4000000
+    }
+  ],
+  "prohibited_portable_path_prefixes": [
+    "DeviceSettings.json",
+    "HaSettings.json",
+    "omote-v2/",
+    "editor/"
+  ],
+  "prospective_protocol": {
+    "status": "not-implemented",
+    "require_encrypted_device_bound_session": true,
+    "require_ha_admin_approval_each_deploy": true,
+    "require_target_touchscreen_approval_each_deploy": true,
+    "require_replay_protection": true,
+    "no_remote_rollback": true
+  }
+}
