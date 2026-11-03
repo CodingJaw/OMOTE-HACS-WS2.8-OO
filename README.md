@@ -2,9 +2,9 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev17 — Home Assistant drafts and reviewed snapshots; all device deployments remain disabled.**
+**Development build 0.1.0-dev18 — HACS main-branch updates, read-only firmware API hardening and binary-image retrieval groundwork; firmware deployments remain disabled.**
 
-**Branch policy (2026-11-03):** The current Home Assistant HACS installation is verified to work **only from `main`** (`v0.1.0-dev17`). `verified-dev17` preserves the identical known-good commit and `working` remains the older dev14 fallback. All new HACS work stays in isolated `feature/*` branches. Do **not** merge development into `main`, switch the installed production HACS source, or enable firmware deployment without explicit approval and real HA acceptance testing. See [branch and release policy](docs/BRANCH_AND_RELEASE_POLICY.md). The stable OMOTE firmware branch is unaffected.
+**Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
 **2024.9.1 setup fix:** The config-flow form now uses serializable built-in field types and validates hostnames after submission. Tests exercise the HA 2024.9.1 form serializer.
 
