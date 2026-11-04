@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import types
@@ -55,9 +56,11 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         self.raw_calls = 0
         self.source = DOC
         self.status_mode = "good"
+        self.pair_mode = "legacy"
         self.raw_mode = "fragmented"
         app = web.Application()
         app.router.add_get("/api/status", self._status)
+        app.router.add_get("/api/config/v2/pairing/status", self._pair_status)
         app.router.add_get("/api/fs/stat", self._stat)
         app.router.add_get("/api/fs/read/raw", self._raw)
         app.router.add_get("/api/fs/read/chunk", self._chunk)
@@ -84,6 +87,22 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
                 content_type="application/json",
             )
         return web.json_response({"api": "omote-config-v1"})
+
+
+    async def _pair_status(self, request):
+        if self.pair_mode == "legacy":
+            raise web.HTTPNotFound()
+        if self.pair_mode == "redirect":
+            raise web.HTTPFound(location="http://127.0.0.1:1/exfil")
+        if self.pair_mode == "oversize":
+            return web.Response(body=b'{"padding":"' + b"x" * 5000 + b'"}')
+        fixture = json.loads(
+            (Path(__file__).resolve().parent /
+             "fixtures/pairing_v1_preview_contract.json").read_text()
+        )["response"]
+        if self.pair_mode == "fake-secure":
+            fixture["session_ready"] = True
+        return web.json_response(fixture)
 
     async def _stat(self, request):
         path = request.query.get("path")
@@ -131,6 +150,31 @@ class TestCompleteHttpReads(unittest.IsolatedAsyncioTestCase):
         return web.Response(
             body=data, headers=headers, content_type="application/octet-stream"
         )
+
+
+    async def test_pairing_status_legacy_returns_disabled(self):
+        status = await self.api.pairing_status()
+        self.assertFalse(status["available"])
+        self.assertFalse(status["pairing_enabled"])
+        self.assertFalse(status["deployment_enabled"])
+
+    async def test_pairing_status_preview_never_authorizes_pairing(self):
+        self.pair_mode = "valid"
+        status = await self.api.pairing_status()
+        self.assertTrue(status["available"])
+        self.assertFalse(status["encrypted_session_ready"])
+        self.assertFalse(status["pairing_enabled"])
+
+    async def test_forged_pairing_enabled_metadata_is_rejected(self):
+        self.pair_mode = "fake-secure"
+        with self.assertRaises(client.OmoteApiError):
+            await self.api.pairing_status()
+
+    async def test_pairing_redirect_and_oversized_payload_fail_closed(self):
+        for mode in ("redirect", "oversize"):
+            self.pair_mode = mode
+            with self.subTest(mode=mode), self.assertRaises(client.OmoteApiError):
+                await self.api.pairing_status()
 
     async def test_legacy_json_redirect_rejected(self):
         self.status_mode = "redirect"
