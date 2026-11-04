@@ -16,6 +16,8 @@ class OmoteManagerPanel extends HTMLElement {
     this._fileRequest = 0;
     this._capabilityRequest = 0;
     this._capabilityEntry = null;
+    this._pairingRequest = 0;
+    this._pairingEntry = null;
     this.workspace = null;
     // Versioned panel name prevents HA from retaining older custom elements.
   }
@@ -61,9 +63,10 @@ class OmoteManagerPanel extends HTMLElement {
       '        <p id="device-subtitle" class="muted"></p></div>' +
       '        <div class="actions"><button type="button" id="refresh" class="secondary">Refresh</button>' +
       '        <button type="button" id="backup" class="primary">Back up JSON</button>' +
-      '        <button type="button" id="inspect-capabilities" class="secondary">Check firmware safety</button></div>' +
+      '        <button type="button" id="inspect-capabilities" class="secondary">Check firmware safety</button><button type="button" id="inspect-pairing" class="secondary">Check pairing readiness</button></div>' +
       '      </div>' +
       '      <div id="capability-inspector" class="capability-inspector" role="status" aria-live="polite">Select a remote to check firmware security features.</div>' +
+      '      <div id="pairing-inspector" class="capability-inspector" role="status" aria-live="polite">Pairing has not been checked. This screen cannot start pairing.</div>' +
       '      <div id="categories" class="categories" aria-label="Configuration categories"></div>' +
       '      <div class="content-grid">' +
       '        <section class="file-pane"><h3>Configuration files</h3><div id="file-list"></div></section>' +
@@ -89,6 +92,9 @@ class OmoteManagerPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("inspect-capabilities").addEventListener("click", () => {
       void this.inspectCapabilities();
+    });
+    this.shadowRoot.getElementById("inspect-pairing").addEventListener("click", () => {
+      void this.inspectPairing();
     });
     this.shadowRoot.getElementById("nav-overview").addEventListener("click", () => {
       this._navigateTo("overview");
@@ -267,12 +273,21 @@ class OmoteManagerPanel extends HTMLElement {
     backup.disabled = !remote || !remote.online;
     this.shadowRoot.getElementById("inspect-capabilities").disabled =
       !remote || !remote.online;
+    this.shadowRoot.getElementById("inspect-pairing").disabled =
+      !remote || !remote.online;
     if (this._capabilityEntry !== (remote ? remote.entry_id : null)) {
       this._capabilityEntry = remote ? remote.entry_id : null;
       this._capabilityRequest++;
       this.shadowRoot.getElementById("capability-inspector").textContent =
         remote ? "Select Check firmware safety to inspect read-only capabilities."
           : "Select a remote to inspect its firmware capabilities.";
+    }
+    if (this._pairingEntry !== (remote ? remote.entry_id : null)) {
+      this._pairingEntry = remote ? remote.entry_id : null;
+      this._pairingRequest++;
+      this.shadowRoot.getElementById("pairing-inspector").textContent =
+        remote ? "Select Check pairing readiness. Pairing itself remains disabled."
+          : "Select a remote to inspect pairing readiness.";
     }
     const categories = this.shadowRoot.getElementById("categories");
     categories.replaceChildren();
@@ -430,6 +445,42 @@ class OmoteManagerPanel extends HTMLElement {
           remote.entry_id === this._selectedRemote) {
         button.disabled = false;
       }
+    }
+  }
+
+
+  async inspectPairing() {
+    const remote = this.selectedRemote();
+    if (!remote || !remote.online || !this._hass) return;
+    const request = ++this._pairingRequest;
+    const button = this.shadowRoot.getElementById("inspect-pairing");
+    const view = this.shadowRoot.getElementById("pairing-inspector");
+    button.disabled = true;
+    view.textContent = "Reading read-only pairing readiness…";
+    try {
+      const info = await this._hass.callWS({
+        type: "omote_manager/pairing/status", entry_id: remote.entry_id
+      });
+      if (request !== this._pairingRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      const title = document.createElement("strong");
+      title.textContent = info.available
+        ? "Firmware pairing API: preliminary Security2 contract"
+        : "Firmware pairing API: not available";
+      const details = document.createElement("p");
+      details.textContent = "Scheme: " + (info.scheme || "none") +
+        " · Encrypted session: NOT ACTIVE · Pairing: DISABLED · Deployment: DISABLED";
+      const explanation = document.createElement("p");
+      explanation.textContent = info.explanation || "Secure pairing is not available.";
+      view.replaceChildren(title, details, explanation);
+    } catch (error) {
+      if (request !== this._pairingRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      view.textContent = "Pairing readiness inspection unavailable: " +
+        String(error.message || error) + ". Pairing and deployment remain disabled.";
+    } finally {
+      if (request === this._pairingRequest &&
+          remote.entry_id === this._selectedRemote) button.disabled = false;
     }
   }
 
