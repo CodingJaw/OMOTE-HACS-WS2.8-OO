@@ -116,6 +116,23 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("omote-config-generation-v1",
                       (ROOT / "single_active_manifest.py").read_text())
 
+        # Dev19: public PNG/JPEG diagnostics must be exposed in the panel,
+        # read bytes on the backend, and never claim image backup/deployment.
+        self.assertIn('id="studio-image-check"', workspace_js)
+        self.assertIn("omote_manager/assets/diagnose", workspace_js)
+        self.assertIn("register_asset_websockets",
+                      (ROOT / "workspace_ws.py").read_text())
+        image_ws = (ROOT / "asset_ws.py").read_text()
+        image_diag = (ROOT / "asset_diagnostics.py").read_text()
+        self.assertIn("connection.user.is_admin", image_ws)
+        self.assertIn("inspect_remote_images(coordinator.api)", image_ws)
+        self.assertIn("await api.read_image_asset(path)", image_diag)
+        self.assertIn('"complete_backup": False', image_diag)
+        self.assertIn('"deployment_enabled": False', image_diag)
+        self.assertNotIn("._session.post(", image_ws + image_diag)
+        self.assertNotIn("._session.put(", image_ws + image_diag)
+
+
         self.assertNotIn("Generation activation: DISABLED", panel_js)
         self.assertIn("recovery_required", panel_js)
 
