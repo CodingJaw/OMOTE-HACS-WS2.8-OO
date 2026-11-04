@@ -33,7 +33,7 @@ class OmoteWorkspaceStudio {
   _build() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev18";
+    stylesheet.href = "/omote_manager_static/workspace.css?v=0.1.0-dev19";
     this.root.append(stylesheet);
     const section = document.createElement("section");
     section.className = "studio pane";
@@ -152,7 +152,7 @@ class OmoteWorkspaceStudio {
 
   async _loadSceneEditor() {
     try {
-      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev18");
+      const {attachSceneEditor} = await import("./scene-editor.js?v=0.1.0-dev19");
       this.sceneEditor = attachSceneEditor(this);
     } catch (error) {
       console.error("OMOTE scene/page editor failed to initialize", error);
