@@ -15,6 +15,10 @@ class OmoteWorkspaceStudio {
     this.backupHistory = [];
     this.backupEntry = null;
     this.backupToken = 0;
+    this.imageToken = 0;
+    this.imageBusy = false;
+    this.imageReport = null;
+    this.imageMessage = "";
     this.sceneEditor = null;
     this._build();
     void this._loadSceneEditor();
@@ -64,6 +68,15 @@ class OmoteWorkspaceStudio {
       '  <p class="muted studio-backup-warning">Does not restore anything to the Waveshare.',
       '    Full-device firmware, credentials and image assets are not included.</p>',
       '</section>',
+      '<section class="studio-backup-history" aria-label="Image asset diagnostic">',
+      '  <header><div><h3>PNG/JPEG image diagnostics</h3>',
+      '    <p class="muted">Read and verify public image files from the selected Waveshare. No upload or configuration changes.</p></div>',
+      '    <button type="button" id="studio-image-check">Check remote images</button></header>',
+      '  <p id="studio-image-status" role="status" aria-live="polite" class="muted">Not tested yet.</p>',
+      '  <div id="studio-image-results" class="studio-list"></div>',
+      '  <p class="muted studio-backup-warning">Reports filenames, received byte counts and SHA-256 only.',
+      '    This does not save image backups, verify an atomic snapshot or enable deployment.</p>',
+      '</section>',
       '<div class="studio-columns">',
       '  <section class="studio-card"><header><h3>1. Locations</h3><span class="muted">Hierarchy</span></header>',
       '    <p class="studio-help">Organize rooms and devices without altering OMOTE firmware JSON.</p>',
@@ -108,6 +121,7 @@ class OmoteWorkspaceStudio {
     this.ui("studio-reviewed-load").addEventListener("click", () => void this.loadReviewedDraft());
     this.ui("studio-backup-refresh").addEventListener("click", () => void this.loadBackups());
     this.ui("studio-backup-load").addEventListener("click", () => void this.loadBackupDraft());
+    this.ui("studio-image-check").addEventListener("click", () => void this.checkImages());
     this.ui("studio-backup-select").addEventListener("change", () => this.renderBackups());
     this.ui("studio-new-location").addEventListener("submit", event => {
       event.preventDefault();
@@ -230,7 +244,12 @@ class OmoteWorkspaceStudio {
     this.backupEntry = null;
     this.backupHistory = [];
     ++this.backupToken;
+    ++this.imageToken;
+    this.imageReport = null;
+    this.imageMessage = "";
+    this.imageBusy = false;
     this.renderBackups();
+    this.renderImages();
     if (this.sceneEditor) this.sceneEditor.onRemoteChanged();
     this.selectedFile = "";
     this.selectedCommand = "";
@@ -254,6 +273,7 @@ class OmoteWorkspaceStudio {
       void this.loadBackups();
     }
     this.renderReviewed();
+    this.renderImages();
     this.renderLocations();
     this.renderTemplates();
     this.renderCommands();
@@ -380,6 +400,76 @@ class OmoteWorkspaceStudio {
       this.ui("studio-issues").textContent =
         "Backup loaded. Run Validate draft before further editing.";
       this.render();
+    }
+  }
+
+
+  renderImages() {
+    const remote = this.panel.selectedRemote();
+    const button = this.ui("studio-image-check");
+    button.disabled = this.imageBusy || !remote || !remote.online;
+    const status = this.ui("studio-image-status");
+    const list = this.ui("studio-image-results");
+    const report = this.imageReport;
+    list.replaceChildren();
+    if (this.imageBusy) {
+      status.textContent = "Scanning live remote JSON and reading public PNG/JPEG images…";
+      return;
+    }
+    if (this.imageMessage) {
+      status.textContent = this.imageMessage;
+      return;
+    }
+    if (!report) {
+      status.textContent = remote
+        ? "Not tested. Click Check remote images to scan the device."
+        : "Select an online remote to check images.";
+      return;
+    }
+    status.textContent = report.checked_count
+      ? report.verified_count + "/" + report.checked_count +
+        " images verified · " + report.referenced_count + " referenced · " +
+        report.unverified_references + " references missing or unreadable · " +
+        report.total_bytes + " bytes read. No images were backed up."
+      : report.note;
+    for (const asset of report.assets || []) {
+      const item = document.createElement("div");
+      item.className = "studio-item";
+      const name = document.createElement("strong");
+      name.textContent = (asset.verified ? "PASS" : "FAIL") + " · " +
+        (asset.referenced ? "Referenced" : "Unreferenced") + " · " + asset.path;
+      const details = document.createElement("small");
+      details.textContent = asset.verified
+        ? asset.bytes + " bytes · SHA-256 " + asset.sha256
+        : asset.error || "Image verification failed";
+      item.append(name, details);
+      list.append(item);
+    }
+  }
+
+  async checkImages() {
+    const entry = this.selectedEntry();
+    const remote = this.panel.selectedRemote();
+    if (!entry || !remote?.online || this.imageBusy || !this.hass()) return;
+    const token = ++this.imageToken;
+    this.imageBusy = true;
+    this.imageReport = null;
+    this.imageMessage = "";
+    this.renderImages();
+    try {
+      const result = await this.hass().callWS({
+        type: "omote_manager/assets/diagnose", entry_id: entry
+      });
+      if (token !== this.imageToken || this.selectedEntry() !== entry) return;
+      this.imageReport = result;
+    } catch (error) {
+      if (token !== this.imageToken || this.selectedEntry() !== entry) return;
+      this.imageMessage = "Image diagnostic failed: " + String(error.message || error);
+    } finally {
+      if (token === this.imageToken && this.selectedEntry() === entry) {
+        this.imageBusy = false;
+        this.renderImages();
+      }
     }
   }
 
