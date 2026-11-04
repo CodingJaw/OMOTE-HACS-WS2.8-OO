@@ -116,6 +116,18 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn("omote-config-generation-v1",
                       (ROOT / "single_active_manifest.py").read_text())
 
+        # Security2 pairing readiness is inspected only; no pairing controls
+        # or device writes are enabled until real PAKE/identity/touch interop.
+        self.assertIn('id="inspect-pairing"', panel_js)
+        self.assertIn("omote_manager/pairing/status", panel_js)
+        self.assertIn("async def pairing_status", capability_api)
+        self.assertIn("websocket_pairing_status", capability_panel)
+        self.assertIn("PairingStatusError", (ROOT / "pairing_model.py").read_text())
+        self.assertIn('"encrypted_session_ready": False',
+                      (ROOT / "pairing_model.py").read_text())
+        self.assertIn("Pairing: DISABLED", panel_js)
+
+
         # Dev19: public PNG/JPEG diagnostics must be exposed in the panel,
         # read bytes on the backend, and never claim image backup/deployment.
         self.assertIn('id="studio-image-check"', workspace_js)
