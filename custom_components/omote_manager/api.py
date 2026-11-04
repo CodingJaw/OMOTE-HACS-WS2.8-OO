@@ -18,6 +18,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import MAX_BACKUP_FILE_BYTES, SUPPORTED_API
 from .capability_model import CapabilitiesError, summarize_capabilities, summarize_storage_status
+from .pairing_model import PairingStatusError, summarize_pairing_status
 from .workspace_model import WorkspaceError, parse_jsonc
 
 _LOGGER = logging.getLogger(__name__)
@@ -131,6 +132,34 @@ class OmoteApi:
             return summarize_storage_status(json.loads(raw.decode("utf-8")))
         except (UnicodeDecodeError, ValueError, CapabilitiesError) as exc:
             raise OmoteApiError("Invalid firmware storage diagnostics") from exc
+
+    async def pairing_status(self) -> dict[str, Any]:
+        """Read preview Security2 readiness. No authentication or pairing.
+
+        Legacy firmware may return 404. Never follow redirects or interpret
+        self-advertised features as permission to enable a pairing interface.
+        """
+        path = "/api/config/v2/pairing/status"
+        try:
+            async with asyncio.timeout(12):
+                async with self._session.get(
+                    self._base + path,
+                    timeout=ClientTimeout(total=10),
+                    allow_redirects=False,
+                ) as response:
+                    if response.status == 404:
+                        return summarize_pairing_status(None)
+                    if response.status != 200:
+                        raise OmoteApiError(
+                            f"Pairing readiness returned HTTP {response.status}"
+                        )
+                    raw = await self._read_complete(response, 4096)
+        except (ClientError, asyncio.TimeoutError) as exc:
+            raise OmoteApiError("Read-only pairing readiness request failed") from exc
+        try:
+            return summarize_pairing_status(json.loads(raw.decode("utf-8")))
+        except (UnicodeDecodeError, ValueError, PairingStatusError) as exc:
+            raise OmoteApiError("Invalid or unsafe pairing readiness metadata") from exc
 
     async def files(self) -> list[str]:
         """Enumerate JSON files without downloading their contents."""
