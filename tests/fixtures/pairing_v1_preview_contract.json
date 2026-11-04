@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "firmware_branch": "feature/config-v2-transactional",
+  "api_path": "/api/config/v2/pairing/status",
+  "method": "GET",
+  "response": {
+    "api_version": "omote-pairing-v1-preview",
+    "state": "disabled",
+    "security_scheme": "protocomm-security2-srp6a-aes256gcm",
+    "transport": "not-started",
+    "transport_port": 0,
+    "pairing_window_open": false,
+    "paired": false,
+    "device_identity_available": false,
+    "touch_approval_required": true,
+    "session_ready": false,
+    "deployment_enabled": false
+  },
+  "requirements": {
+    "transport": "ESP-IDF Security2 SRP6a + AES-256-GCM; HTTPD transport isolated from Arduino legacy port-80 server",
+    "code": "fresh six-digit CSPRNG PIN displayed on Waveshare only; never transmitted in clear HTTP",
+    "salt_verifier": "device-generated ephemeral salt and SRP verifier, destroyed after pairing window",
+    "peer_identity": "long-lived pinned device key plus cryptographic HA peer key possession proof",
+    "pairing_confirmation": "fresh touchscreen approval of the exact HA peer fingerprint",
+    "attempt_limit": "persistently limited to five candidates, with power-cycle resistant lockout",
+    "reinstall": "fresh pairing required, device configuration preserved",
+    "deployment": "separately authorized by HA administrator plus fresh touchscreen approval; disabled"
+  },
+  "notes": "This preview response is intentionally not a secure pairing endpoint; a successful GET cannot authorize any write, token or paired state."
+}
