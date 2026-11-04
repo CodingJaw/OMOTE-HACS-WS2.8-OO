@@ -1,6 +1,6 @@
 # OMOTE HACS secure pairing — Python interoperability plan
 
-Status: **not implemented**. The current HACS client remains read-only.
+Status (2026-11-04): **pairing not implemented**. HACS dev20 now has a read-only pairing-status inspector and strict protocol contract; it still cannot open a pairing window or create an encrypted session.
 There is no secure remote pairing, device identity proof, firmware upload
 or config deployment. This document is a compatibility checklist, not an
 instruction to expose HTTP write routes.
@@ -27,6 +27,35 @@ instruction to expose HTTP write routes.
 - Pairing does NOT authorize deployment. Every future deployment requires
   a fresh HA admin action and a fresh target touchscreen approval of the
   exact transaction and manifest digests.
+
+## Verified design/progress and next boundary
+
+- A read-only preview is now defined by the firmware-owned
+  `Platformio/tools/config-v2-tests/pairing_v1_preview_contract.json`.
+  HACS pins the fixture in CI and validates `GET /api/config/v2/pairing/status`
+  with 4 KiB limit, redirect rejection, legacy 404 fallback and strict
+  fail-closed typed fields. An untrusted device's preview is **not identity
+  proof**. The HACS Overview button only reports unsupported/disabled.
+- On the isolated Waveshare firmware feature branch,
+  `config_v2_sec2_srp_material.*` actually invokes
+  `esp_srp_gen_salt_verifier` with a fresh local six-digit code and
+  zeroizes/free its owned salt/verifier. It does not start HTTPD, authorize
+  pairing, or expose a PIN.
+- **Next:** implement a bounded Security2 HTTPD transport isolated from the
+  read-only Arduino WebServer; prove the official ESP-IDF `security2.py`
+  client interoperates with an actual locally opened firmware pairing window.
+  The encrypted channel must then carry a device-identity key possession
+  proof and a separately verified HA peer public key challenge bound to
+  that exact PAKE session before any trust is persisted.
+- Run negative and power-cycle tests: wrong PIN, unsolicited discovery,
+  spoofed identity, replay, aborted sessions, simultaneous sessions, five
+  failures across reset, expired PIN, touchscreen reject, HA reinstallation.
+  HACS private-key generation and storage must be designed before enabling
+  any UI that accepts a real PIN.
+- **Do not mark user acceptance** until real board testing. Existing v1
+  config import, read-only diagnostics and local backup workflows remain
+  separate. Remote-to-remote trust (other ESP routers) is a later extension
+  after the HA-to-Waveshare transport is proven.
 
 ## Required independent tests before an enabled pairing screen
 
