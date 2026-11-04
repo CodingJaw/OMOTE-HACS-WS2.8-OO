@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev18 — HACS main-branch updates, read-only firmware API hardening and binary-image retrieval groundwork; firmware deployments remain disabled.**
+**Development build 0.1.0-dev19 — HACS main-branch updates and user-visible read-only PNG/JPEG diagnostics; firmware deployments remain disabled.**
 
 **Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
@@ -63,6 +63,34 @@ The v0.1.0-dev17 feature set adds a **read-only** PNG/JPEG dependency inventory
 and USB recovery preparation. It does not yet capture complete image
 binaries into HACS backups or support image uploads. Deployment remains
 hard-disabled.
+
+## PNG/JPEG read-only diagnostics (v0.1.0-dev19)
+
+The dev18 backend could read eligible binary images but exposed no button to
+test the functionality. Dev19 adds an explicit **Profile Studio → PNG/JPEG image
+diagnostics → Check remote images** action.
+
+1. Select an **online Waveshare remote** in OMOTE Manager and open Profile Studio.
+2. Click **Check remote images**. The backend reads the remote's current public
+   configuration JSON, finds image references in Image widgets and supported
+   image fields, and also enumerates public PNG/JPEG files in the device tree.
+3. Inspect the result rows: referenced vs unreferenced, successful complete
+   binary reads, actual byte length and SHA-256, missing files and transfer
+   errors. The report contains no JSON content, binary image data or secrets.
+4. If the report says **no PNG/JPEG files or references found**, image
+   transport has **not** been tested on this device. Do not report a pass.
+   Testing a real JPEG requires an existing public image on the remote;
+   dev19 does not upload images or modify the remote.
+5. HACS may need **Redownload**, a Home Assistant restart and hard browser
+   refresh to load the dev19 sidebar after updating from dev18.
+
+The scan is a read-only, bounded diagnostic: at most 64 image paths,
+512 KiB per image and 4 MiB total returned image bytes. The underlying API
+checks image signature, expected size, post-read size and raw/chunk fallback.
+SHA-256 covers received bytes but the current firmware doesn't expose an
+immutable image revision, so this is **not** an atomic integrity proof.
+**Image assets remain excluded from Home Assistant backups and reviewed
+snapshots. Deployment remains disabled.**
 
 ## Compatibility baseline
 
@@ -219,7 +247,7 @@ or rollback becomes enabled**.
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev18, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev19, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 
