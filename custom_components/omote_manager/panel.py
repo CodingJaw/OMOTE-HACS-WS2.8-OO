@@ -35,6 +35,7 @@ async def async_register_manager_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_overview)
     websocket_api.async_register_command(hass, websocket_file)
     websocket_api.async_register_command(hass, websocket_capabilities)
+    websocket_api.async_register_command(hass, websocket_pairing_status)
     register_workspace_websockets(hass)
     await panel_custom.async_register_panel(
         hass,
@@ -183,5 +184,44 @@ async def websocket_capabilities(
                 "error": "Storage diagnostic endpoint unavailable or invalid",
             }
     # A remote's self-advertisement must never grant write authorization.
+    info["deployment_enabled"] = False
+    connection.send_result(msg["id"], info)
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "omote_manager/pairing/status",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_pairing_status(
+    hass: HomeAssistant, connection, msg: dict
+) -> None:
+    """Inspect safe pairing readiness only; no PIN, tokens or pairing writes."""
+    if not _admin_only(connection, msg):
+        return
+    entry_id = msg["entry_id"]
+    if entry_id not in {
+        item.entry_id for item in hass.config_entries.async_entries(DOMAIN)
+    }:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "Unknown OMOTE remote"
+        )
+        return
+    coordinator = hass.data.get(DOMAIN, {}).get(entry_id)
+    if coordinator is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "OMOTE remote is not connected"
+        )
+        return
+    try:
+        info = await coordinator.api.pairing_status()
+    except OmoteApiError:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_UNKNOWN_ERROR,
+            "Could not inspect pairing readiness",
+        )
+        return
+    info["pairing_enabled"] = False
     info["deployment_enabled"] = False
     connection.send_result(msg["id"], info)
