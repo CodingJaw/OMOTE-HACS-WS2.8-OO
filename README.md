@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev19 — HACS main-branch updates and user-visible read-only PNG/JPEG diagnostics; firmware deployments remain disabled.**
+**Development build 0.1.0-dev20 — safe pairing-readiness inspection and shared Config v2 Security2 contract; actual pairing, encryption sessions, and firmware deployments are not enabled.**
 
 **Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
@@ -91,6 +91,42 @@ SHA-256 covers received bytes but the current firmware doesn't expose an
 immutable image revision, so this is **not** an atomic integrity proof.
 **Image assets remain excluded from Home Assistant backups and reviewed
 snapshots. Deployment remains disabled.**
+
+## Security2 pairing API preparation (v0.1.0-dev20)
+
+This release introduces a safe, read-only bridge between the HACS API and
+firmware's **experimental** Security2 pairing design; **it does not perform
+pairing or create encrypted sessions**. HACS remains safe to install from
+`main` and all remote configuration writes remain disabled.
+
+In **OMOTE Manager → Overview**, select a remote and click
+**Check pairing readiness**. HACS reads only
+`GET /api/config/v2/pairing/status` with a 4 KiB response cap, no redirects
+and strict schema/type checking. Legacy firmware that returns HTTP 404 is
+reported as **not supported**, not as a connection failure. The isolated
+firmware `feature/config-v2-transactional` preview returns an informational
+**disabled** status. Forged claims of pairing, a live session or deployment
+are rejected. No PIN entry, remote pairing trigger, or new trust record exists
+in HACS dev20.
+
+The firmware feature branch separately contains the first *real*
+device-side cryptographic step: generation and destruction of ephemeral
+SRP6a salt/verifier material using Espressif's
+`esp_srp_gen_salt_verifier`, intended for a fresh, locally displayed six-digit
+PIN. The code is not attached to an encrypted HTTPD listener, and an
+end-to-end PAKE/identity handshake has **not** been demonstrated.
+
+**Next gates:** isolate a short-lived Security2 HTTPD transport (not the
+unsecured Arduino port 80), test with the pinned official ESP-IDF Python
+client; bind device identity and HA public-key possession proof to the
+encrypted session; enforce reboot-resistant attempt limits, touchscreen
+fingerprint approval, credential storage/revocation and reconnect behavior.
+Only after physical board testing will actual pairing be exposed.
+Configuration deployment is a later, separately approved milestone.
+
+The same firmware-owned JSON contract is pinned and tested by HACS CI
+(`tests/fixtures/pairing_v1_preview_contract.json`). No new background
+network listener is installed by this HACS update.
 
 ## Compatibility baseline
 
@@ -247,7 +283,7 @@ or rollback becomes enabled**.
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev19, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev20, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
 
 ## Development roadmap
 
