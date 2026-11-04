@@ -29,11 +29,24 @@ jobs:
           local = json.loads(Path('tests/fixtures/config_v2_preview_contract.json').read_text())
           assert upstream == local, 'Firmware and HACS API contract fixtures differ'
           PY
+      - name: Download pinned firmware pairing preview contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/5640c2d451d0e34174a5b41fc21896491a5dc692/Platformio/tools/config-v2-tests/pairing_v1_preview_contract.json \
+            -o /tmp/omote-contract/pairing.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          upstream = json.loads(Path('/tmp/omote-contract/pairing.json').read_text())
+          local = json.loads(Path('tests/fixtures/pairing_v1_preview_contract.json').read_text())
+          assert upstream == local, 'Firmware and HACS pairing contract fixtures differ'
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
         env:
           OMOTE_FIRMWARE_CONTRACT: /tmp/omote-contract/preview.json
+          OMOTE_FIRMWARE_PAIRING_CONTRACT: /tmp/omote-contract/pairing.json
         run: python -m unittest discover -s tests -v
       - name: Validate sidebar JavaScript
         run: |
