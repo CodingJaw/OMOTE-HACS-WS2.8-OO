@@ -1,0 +1,35 @@
+{
+  "contract": "omote-sec2-lab-ha-candidate-proof-v1",
+  "scope": "laboratory_only_no_persistent_identity_or_authorization",
+  "transport": {
+    "security": "ESP-IDF protocomm Security2 SRP6a AES-256-GCM",
+    "port": 18082,
+    "endpoint": "omote-ha-proof",
+    "method": "POST",
+    "must_be_inside_completed_encrypted_security2_session": true
+  },
+  "request": {
+    "version": 1,
+    "layout": [
+      "version:u8",
+      "candidate_ha_public_key:65_bytes_sec1_uncompressed_p256",
+      "client_nonce:32_random_bytes",
+      "signature_length:u16_big_endian",
+      "signature:asn1_der_ecdsa_sha256_8_to_80_bytes"
+    ],
+    "header_bytes": 100,
+    "signature_min_bytes": 8,
+    "signature_max_bytes": 80,
+    "signature_message": "ASCII(OMOTE-SEC2-LAB-HA-PROOF-V1)||uint32_big_endian(Security2_session_cookie_id)||candidate_ha_public_key_65||client_nonce_32",
+    "domain": "OMOTE-SEC2-LAB-HA-PROOF-V1"
+  },
+  "response": {
+    "authenticated_encrypted_payload_ascii": "OMOTE-LAB-HA-PROOF-OK-V1"
+  },
+  "authorization": {
+    "trusted_pairing": false,
+    "device_identity_authenticated": false,
+    "ha_identity_persisted": false,
+    "configuration_writes_enabled": false
+  }
+}
