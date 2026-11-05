@@ -57,6 +57,29 @@ instruction to expose HTTP write routes.
   separate. Remote-to-remote trust (other ESP routers) is a later extension
   after the HA-to-Waveshare transport is proven.
 
+## Shared lab key-possession protocol (2026-11-04)
+
+A new *experimental* firmware-only encrypted endpoint
+`POST /omote-ha-proof` verifies a P-256 ECDSA signature for a candidate
+Home Assistant key, bound to the current Espressif Security2 session ID
+and a fresh 32-byte client nonce. The exact versioned wire contract is
+`tests/fixtures/sec2_lab_ha_proof_contract.json`, pinned to the
+firmware-owned source in HACS CI.
+
+**This is neither trusted pairing nor a HACS runtime connection:** the
+manual reference Python client creates an ephemeral test key. Firmware
+does not save it or grant privileges; HACS dev20 does not call the lab
+endpoint. The original port-80 configuration interface stays read-only
+and fully usable. No HACS pairing UI or firmware write route is enabled.
+
+Before HACS can use this candidate proof, implement the missing
+counterpart: a durable hardware-bound device public-key identity with
+device key-possession proof, protected private key storage, pinned
+device fingerprint verification in HACS, durable HA identity key storage,
+replay-safe transcript confirmation, and a one-shot physical touchscreen
+approval bound to **both** keys and the actual Security2 session.
+Old credentials must not be silently inherited by a reinstalled HA.
+
 ## Required independent tests before an enabled pairing screen
 
 1. Python version/dependency compatibility with HA 2024.9.1.
