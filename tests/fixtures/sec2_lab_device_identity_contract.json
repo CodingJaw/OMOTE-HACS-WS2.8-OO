@@ -1,0 +1,50 @@
+{
+  "contract": "omote-sec2-lab-device-software-identity-v1",
+  "scope": "isolated_lab_only_no_production_device_attestation",
+  "persistence": {
+    "trigger": "physically_touched_Settings_Start_lab_only",
+    "namespace": "omsec2id",
+    "key": "labkey",
+    "record_format": "u8_version_1||32_byte_p256_scalar||65_byte_sec1_uncompressed_public",
+    "nvs_encryption_guaranteed": false,
+    "hardware_protected": false,
+    "on_invalid_record": "fail_closed_no_network_rotation",
+    "on_reboot": "reuse_valid_record_when_next_local_lab_window_opened"
+  },
+  "transport": {
+    "scheme": "ESP-IDF protocomm Security2 SRP6a AES-256-GCM",
+    "endpoint": "omote-device-proof",
+    "port": 18082,
+    "method": "POST",
+    "requires_verified_encrypted_session": true
+  },
+  "request": {
+    "version": 1,
+    "layout": [
+      "u8_version_1",
+      "32_byte_random_client_challenge"
+    ],
+    "bytes": 33
+  },
+  "response": {
+    "version": 1,
+    "layout": [
+      "u8_version_1",
+      "65_byte_sec1_uncompressed_p256_public_key",
+      "u16_be_der_signature_length",
+      "8_to_80_byte_ecdsa_sha256_der_signature"
+    ],
+    "header_bytes": 68,
+    "max_signature_bytes": 80,
+    "domain": "OMOTE-SEC2-LAB-DEVICE-PROOF-V1",
+    "signed_message": "ASCII_domain||u32_be_security2_session_id||client_challenge_32||device_public_key_65",
+    "fingerprint": "lowercase_sha256_hex_of_65_byte_public_key"
+  },
+  "authorization": {
+    "production_device_identity_verified": false,
+    "trusted_pairing": false,
+    "ha_identity_persisted": false,
+    "configuration_writes_enabled": false,
+    "ota_enabled": false
+  }
+}
