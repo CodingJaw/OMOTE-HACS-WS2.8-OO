@@ -80,6 +80,37 @@ replay-safe transcript confirmation, and a one-shot physical touchscreen
 approval bound to **both** keys and the actual Security2 session.
 Old credentials must not be silently inherited by a reinstalled HA.
 
+## Device software identity lab milestone (2026-11-05)
+
+Firmware now has an **opt-in-only** third encrypted LAB endpoint,
+`omote-device-proof`, with a locally provisioned P-256 software key.
+The device signs a fresh client challenge over
+`OMOTE-SEC2-LAB-DEVICE-PROOF-V1 || current Security2 session ID ||
+challenge || device public key` and returns its SEC1 public key and
+DER signature inside AES-GCM. A manual Python tester verifies it and
+displays a SHA-256 public-key fingerprint. The exact versioned contract
+is pinned in HACS `tests/fixtures/sec2_lab_device_identity_contract.json`
+and cross-checked with firmware in CI.
+
+**Not production device identity:** The key is stored in ordinary NVS
+under `omsec2id/labkey`, which is not guaranteed encrypted or
+hardware-protected on this board configuration. Copying the flash
+may copy the private key. HACS must not pin it as trusted production
+device identity, and it does not connect to `omote-device-proof`.
+No eFuse provisioning, paired HA identity, approval action,
+authorization, or deployment has been implemented.
+
+The previously user-verified hardware Security2 SRP6a/AES-GCM and
+candidate HA P-256 proof both passed. The *new* software device identity
+path is code-level only until the lab build and hardware
+challenge/signature test pass. Firmware feature branch is isolated and
+the normal Waveshare/HACS behavior is unaffected.
+
+The next security architecture task is establishing how to protect the
+production private key on the ESP32-S3 without accidentally burning
+eFuses or erasing the user's only working remote. That must be designed
+and reviewed before production HA identity pinning or trusted pairing.
+
 ## Required independent tests before an enabled pairing screen
 
 1. Python version/dependency compatibility with HA 2024.9.1.
