@@ -173,6 +173,12 @@ async def run_lab_session(
         raise LabSessionError(stage) from None
     finally:
         if transport is not None:
-            connection = getattr(transport, "conn", None)
-            if connection is not None:
-                connection.close()
+            # New HA transport is async; older offline mock is sync.
+            # Always release open session sockets on cancellation/error.
+            aclose = getattr(transport, "aclose", None)
+            if callable(aclose):
+                await aclose()
+            else:
+                connection = getattr(transport, "conn", None)
+                if connection is not None:
+                    connection.close()
