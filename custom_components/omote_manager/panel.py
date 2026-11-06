@@ -22,9 +22,9 @@ from .candidate_identity_ws import register_candidate_identity_websockets
 from .workspace_ws import register_workspace_websockets
 
 PANEL_PATH = "omote-manager"
-PANEL_ELEMENT = "omote-manager-panel-v21"
+PANEL_ELEMENT = "omote-manager-panel-v22"
 STATIC_PATH = "/omote_manager_static"
-ASSET_VERSION = "0.1.0-dev21"
+ASSET_VERSION = "0.1.0-dev22"
 
 
 async def async_register_manager_panel(hass: HomeAssistant) -> None:
