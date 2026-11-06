@@ -29,8 +29,10 @@ class FakeContent:
     def __init__(self, body):
         self.body = body
 
-    async def read(self, maximum):
-        return self.body[:maximum]
+    async def iter_chunked(self, maximum):
+        # Simulate a response split across multiple TCP reads.
+        for offset in range(0, len(self.body), maximum):
+            yield self.body[offset:offset + maximum]
 
 
 class FakeResponse:
