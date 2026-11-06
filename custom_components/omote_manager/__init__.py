@@ -22,6 +22,9 @@ from .panel import async_register_manager_panel
 from .workspace_store import WorkspaceStore
 from .workspace_model import WorkspaceError
 from .workspace_ws import STORE_KEY
+from .candidate_identity import CandidateIdentityStore
+from .candidate_identity_ws import IDENTITY_STORE_KEY
+from homeassistant.helpers.storage import Store
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +40,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     workspace = WorkspaceStore(hass)
     await workspace.async_load()
     hass.data[STORE_KEY] = workspace
+    # Read local candidate metadata only; never generate keys on startup.
+    # A corrupt candidate store must not disable the read-only integration.
+    identities = CandidateIdentityStore(
+        Store(hass, 1, f"{DOMAIN}.candidate_identities")
+    )
+    await identities.async_load()
+    hass.data[IDENTITY_STORE_KEY] = identities
     await async_register_manager_panel(hass)
 
     def _coordinator(call: ServiceCall) -> OmoteCoordinator:
