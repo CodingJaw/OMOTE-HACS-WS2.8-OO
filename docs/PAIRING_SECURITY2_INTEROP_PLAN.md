@@ -340,3 +340,100 @@ The firmware `feature/config-v2-transactional` branch and all eFuses
 remain unchanged. Protected device identity, live session-held
 fingerprint approval, durable trust, re-pairing and PIN-free reconnect
 are not yet implemented.
+
+
+## 2026-11-06 — HACS dev23: explicitly enabled HA-originated LAB exchange
+
+New **experimental** HACS `main` server-side code uses the original
+persistent per-entry candidate HA P-256 key to contact the same isolated
+Waveshare laboratory port-18082 protocol that the standalone
+`sec2_lab_client.py` exercised. This is *not production pairing*.
+
+### Security architecture
+
+- `sec2_lab_http.py` implements an original aiohttp asynchronous transport
+  for only five fixed LAB endpoints. Unlike Espressif's Python
+  `Transport_HTTP` based on synchronous `HTTPConnection`, this does not
+  block HA's event loop and enforces an eight-second request deadline.
+  No redirects, proxy environment, generic URLs, other ports, unrelated
+  firmware APIs, or persistent cookies are permitted. Binary frame bytes
+  preserve the reference client's Latin-1 encoding and the exact verified
+  `session=<uint32>` cookie; responses and requests are limited to 4 KiB.
+- `sec2_lab_espidf.py` loads the **official** Security2 SRP6a/AES-GCM
+  implementation from a local compatible ESP-IDF checkout, only after
+  explicit opt-in. No cryptography code is silently downloaded,
+  installed, or substituted with Security0/Security1. An absent or
+  incomplete checkout and global Python module conflicts fail closed.
+  It requires an ESP-IDF version of the client accepting
+  `sec_patch_ver`, as used by the already-tested standalone client.
+  A compatible ESP-IDF source and its protobuf/cryptography dependencies
+  must exist in the Home Assistant Python environment for a real test.
+- `sec2_lab_ws.py` registers admin-only LAB readiness and execute
+  WebSockets. Actual execution is **disabled by default** unless
+  `OMOTE_SEC2_LAB_ENABLE=1` is set in the HA process environment.
+  `IDF_PATH` must point to the ESP-IDF source root *as mounted on that
+  same HA host/container*, not just a checkout on a separate desktop.
+  The requested target must be the registered remote's private LAN
+  IPv4 address. There is no user-supplied host or port and only one
+  in-flight attempt is accepted per remote.
+- The dev23 Overview section shows LAB readiness and a one-shot
+  experimental action. It requires a separate explicit browser
+  confirmation and the current physically displayed six-digit PIN.
+  Enter the PIN only over a trusted HTTPS HA session if possible.
+  The PIN is transient and never intentionally logged or returned;
+  the firmware's persistent attempt counters still apply. Never retry
+  automatically after an SRP failure or expiry.
+- The existing `sec2_lab_session.py` still performs the saved HA
+  signature frame and verifies the encrypted device software-key
+  challenge. It returns only the two public fingerprints and explicit
+  `paired=false`, `trusted=false`, `deployment_enabled=false`,
+  `ota_enabled=false`. Neither the browser nor a successful lab run
+  can save trust, send a configuration transaction, trigger recovery
+  or OTA, or change eFuses. The firmware code and stable branches
+  have not been modified.
+
+### First installation and acceptance procedure
+
+1. Run the Python offline suites: `test_sec2_lab_session.py`,
+   `test_sec2_lab_http.py`, `test_sec2_lab_espidf.py` and
+   `test_sec2_lab_ws.py`. Confirm complete CI and read-only
+   Profile Studio regression before laboratory activation.
+2. Install HACS dev23 from `main`; restart HA. With the feature gate
+   unset, LAB readiness must explicitly say **disabled** and the test
+   action must remain disabled. Existing dev22 candidate identity
+   fingerprint must be unchanged.
+3. In an isolated development HA installation or deliberately
+   maintained host, install/provide an already-audited matching official
+   ESP-IDF source checkout plus its Python provisioning prerequisites.
+   Set `IDF_PATH` and `OMOTE_SEC2_LAB_ENABLE=1` in the **HA process**
+   environment, then restart HA. Do not set these in a desktop shell
+   and assume they automatically reach an HA container.
+4. In OMOTE Manager, select the registered Waveshare, click
+   **Check LAB prerequisites**, and confirm the explicit LAB action
+   becomes available. This checks the host opt-in and source-path
+   configuration, *not* full dependency compatibility; a missing or
+   mismatched Espressif client must still fail before opening the
+   remote Security2 session.
+5. Only after the firmware lab image and a verified USB backup,
+   physically navigate on Waveshare to Settings > SEC2 encrypted LAB
+   test > Start lab. The firmware opens port 18082 briefly and shows
+   a fresh local six-digit code. In HACS click **Run encrypted LAB test**
+   once, accept the laboratory warning and enter that code. Compare
+   the exact candidate HA SHA-256 public fingerprint shown by HACS
+   with the four rows on the remote. Try Review OK / Reject in
+   deliberately separate windows if needed, respecting the NVS
+   message budget and physical rearm policy.
+6. Regardless of success, verify HACS reports **NOT PAIRED**,
+   normal read-only firmware capability status remains unchanged,
+   and no config/deployment/OTA permission appears. Stop on a
+   mismatch or failed stage; do not blindly retry or erase NVS.
+   This is still *volatile lab evidence*, not a live trusted enrollment.
+
+**Acceptance remains pending:** The new HACS-originated live session,
+correct Home Assistant 2024.9.1 dependency isolation, touchscreen
+fingerprint review, and device test are not yet hardware-confirmed.
+The existing user-confirmed 8/8 offline adapter tests predate dev23;
+new suites require their own test execution. No eFuse or firmware
+update is needed simply to install this HACS work. Permanent trust,
+protected device private key, PIN-free reconnect and deployment are
+still blocked by firmware issue #1 / HACS issue #6.
