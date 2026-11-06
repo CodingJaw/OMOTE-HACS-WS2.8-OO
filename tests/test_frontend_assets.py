@@ -126,6 +126,29 @@ class TestFrontendVersionContract(unittest.TestCase):
         self.assertIn('"encrypted_session_ready": False',
                       (ROOT / "pairing_model.py").read_text())
         self.assertIn("Pairing: DISABLED", panel_js)
+        # Dev22: only an explicit admin UI action generates a persistent
+        # LOCAL candidate key; this is not production remote pairing.
+        self.assertIn('id="prepare-ha-candidate"', panel_js)
+        self.assertIn("async prepareHaCandidate()", panel_js)
+        self.assertIn("async inspectHaCandidate()", panel_js)
+        self.assertIn("omote_manager/pairing/candidate/prepare", panel_js)
+        self.assertIn("omote_manager/pairing/candidate/status", panel_js)
+        self.assertIn("window.confirm(", panel_js)
+        self.assertIn("NOT PAIRED", panel_js)
+        self.assertIn("not encrypted at rest", panel_js)
+        self.assertIn("entry_id: remote.entry_id", panel_js)
+        self.assertIn('info.fingerprint', panel_js)
+        self.assertNotIn("private_der_b64", panel_js)
+        self.assertNotIn("make_lab_ha_proof(", panel_js)
+        ws = (ROOT / "candidate_identity_ws.py").read_text()
+        self.assertIn("connection.user.is_admin", ws)
+        self.assertIn("async_prepare(msg", ws)
+        self.assertNotIn("private_der_b64", ws)
+        self.assertIn(
+            "register_candidate_identity_websockets(hass)",
+            (ROOT / "panel.py").read_text()
+        )
+
 
 
         # Dev19: public PNG/JPEG diagnostics must be exposed in the panel,
