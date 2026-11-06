@@ -45,6 +45,23 @@ class PairingModelTests(unittest.TestCase):
         self.assertFalse(result["pairing_enabled"])
         self.assertFalse(result["deployment_enabled"])
 
+    def test_disabled_production_pairing_is_distinct_from_optional_lab(self):
+        result = model.summarize_pairing_status(FIXTURE["response"])
+        self.assertIn("PRODUCTION pairing only", result["explanation"])
+        self.assertIn("port 18082", result["explanation"])
+        self.assertIn("not monitored by this status API", result["explanation"])
+        self.assertFalse(result["encrypted_session_ready"])
+        self.assertFalse(result["device_identity_verified"])
+        self.assertFalse(result["pairing_enabled"])
+        self.assertFalse(result["deployment_enabled"])
+
+    def test_frontend_does_not_claim_lab_session_is_inactive(self):
+        frontend = (MODULES / "frontend/omote-panel.js").read_text()
+        self.assertIn("Production encrypted session: NOT AVAILABLE", frontend)
+        self.assertNotIn("Encrypted session: NOT ACTIVE", frontend)
+        self.assertIn("Pairing: DISABLED", frontend)
+        self.assertIn("Deployment: DISABLED", frontend)
+
     def test_fake_pairing_security_advertisements_cannot_enable_pairing(self):
         original = FIXTURE["response"]
         for altered in (
