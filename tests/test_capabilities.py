@@ -74,6 +74,13 @@ class TestNormalization(unittest.TestCase):
         self.assertFalse(info["deployment_enabled"])
         self.assertFalse(info["device_identity_available"])
 
+    def test_production_capability_status_does_not_claim_lab_is_missing(self):
+        info = capability.summarize_capabilities(preview())
+        self.assertIn("Production v2 is read-only", info["explanation"])
+        self.assertIn("experimental Security2 LAB listener", info["explanation"])
+        self.assertFalse(info["deployment_enabled"])
+        self.assertFalse(info["device_identity_available"])
+
     def test_all_remote_flags_positive_still_cannot_authorize_deploy(self):
         advertised = preview()
         advertised.update({
