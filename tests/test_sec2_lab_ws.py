@@ -26,6 +26,8 @@ def load_handler():
     components = types.ModuleType("homeassistant.components")
     components.__path__ = []
     ws = types.ModuleType("homeassistant.components.websocket_api")
+    ha.components = components
+    components.websocket_api = ws
     ws.ERR_UNAUTHORIZED = "unauthorized"
     ws.ERR_NOT_FOUND = "not_found"
     ws.ERR_NOT_ALLOWED = "not_allowed"
