@@ -1,9 +1,6 @@
 # OMOTE HACS secure pairing — Python interoperability plan
 
-Status (2026-11-04): **pairing not implemented**. HACS dev20 now has a read-only pairing-status inspector and strict protocol contract; it still cannot open a pairing window or create an encrypted session.
-There is no secure remote pairing, device identity proof, firmware upload
-or config deployment. This document is a compatibility checklist, not an
-instruction to expose HTTP write routes.
+Status (2026-11-06): **production pairing not implemented**. HACS dev22 has read-only pairing status, firmware-owned Security2 lab protocol contracts, and a persistent administrator-prepared P-256 *candidate* HA identity. The isolated Waveshare laboratory image has demonstrated SRP6a/AES-GCM and two P-256 possession proofs on hardware, but HACS itself does **not** establish Security2 sessions or enroll trust. Firmware deployment and OTA remain disabled. This document is a compatibility checklist, not authorization to expose remote write routes.
 
 ## Supported target
 
@@ -212,6 +209,67 @@ turn that CLI into permanent pairing.
 5. Keep **all configuration deployment and OTA disabled** until
    separately authenticated admin action, fresh device touch
    approval of the exact proposed transaction and hardware rollback.
+
+## Next step after HA candidate-key restart acceptance (2026-11-06)
+
+The user verified on Home Assistant that the dev22 per-remote candidate
+public-key SHA-256 fingerprint **survives restarts** and a second
+`Prepare HA key locally` action returns the **same** fingerprint
+without rotating the key. That accepts the local HA persistence gate.
+The candidate is still **NOT PAIRED**.
+
+The firmware-owned `sec2_lab_ha_proof_contract.json` now has an
+additional HACS CI interoperability test,
+`tests/test_candidate_lab_interop.py`. It checks a *persisted* candidate
+HA key across simulated restarts against the exact firmware-specified
+wire frame: version 1; 65-byte SEC1 P-256 public key; 32-byte nonce;
+big-endian DER signature length; and ECDSA-SHA256 over the domain,
+Security2 session ID, key and nonce. It rejects session substitution,
+nonce tampering and wrong signed domain. A clean HA installation has no
+automatically inherited key or trust. This test is completely OFFLINE,
+does not export private material, and does not open port 18082.
+
+### Transport packaging acceptance before enabling any live HACS pairing
+
+The firmware test harness deliberately uses Espressif's reference
+`tools/esp_prov/security/security2.py` and
+`Transport_HTTP` from an explicit `IDF_PATH` checkout. Home
+Assistant normally does **not** include that full source tree,
+its generated protobuf modules or its transport dependencies.
+
+Do **not** import the development-machine's ESP-IDF paths at HA runtime,
+accept arbitrary imported Python packages, shell out to the reference CLI,
+vendor an unreviewed SRP implementation or ask the browser to handle
+HA private keys. First isolate a reviewed, version-pinned, testable
+protocol client compatible with HA Core 2024.9.1, with no access to
+production firmware configuration writes.
+
+Required runtime gates:
+
+1. Explicit administrator-initiated, per-remote LAB action only, with
+   the freshly displayed six-digit PIN entered securely and never logged;
+   no scheduled, boot-triggered or discovery-initiated PAKE attempts.
+2. A strict 120-second local listener timeout, bounded payloads, no
+   redirects, no unexpected IP/port destinations, and the existing
+   five Security2-frame/physical-window quotas honored.
+3. Use the **already persisted** HA private key only inside the server;
+   derive a new client nonce each session, verify both the device
+   possession signature and its 64-hex public-key fingerprint, and
+   bind the candidate HA proof to the exact same encrypted session.
+4. The Waveshare must show the **same HA candidate fingerprint**
+   as HACS. Its physical **Review OK** is still a LAB-only acknowledgement
+   until a protected device key, a live session-held approval, and
+   durable two-way trust replacement are reviewed and implemented.
+5. Negative tests (wrong PIN, substituted endpoint, rogue device key,
+   replay, expired session, reboot, abort, double request), duplicate
+   concurrent attempts, and **no** secret in logs/HTTP/WebSocket replies.
+6. Production API status and HACS deployment/OTA gates must remain
+   disabled regardless of laboratory success.
+
+PIN-free reconnect requires a **separate** mutually authenticated
+cryptographic transport for subsequent sessions. A persisted P-256
+public key and an ECDSA signature by themselves do not establish
+an encrypted channel or a reusable authorization token.
 
 ## Required independent tests before an enabled pairing screen
 
