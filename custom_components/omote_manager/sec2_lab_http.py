@@ -95,9 +95,16 @@ class LabHttpTransport:
                     raise LabHttpTransportError("Out-of-range LAB session ID")
                 if "Cookie" in self.headers and cookie != self.headers["Cookie"]:
                     raise LabHttpTransportError("LAB session changed unexpectedly")
-            raw = await response.content.read(_MAX_RESPONSE_BYTES + 1)
-            if len(raw) > _MAX_RESPONSE_BYTES:
-                raise LabHttpTransportError("Oversized LAB response")
+            # Stream to EOF with an absolute cap. aiohttp read(n) may
+            # return fewer than n bytes before the response is complete.
+            parts = []
+            total = 0
+            async for part in response.content.iter_chunked(512):
+                total += len(part)
+                if total > _MAX_RESPONSE_BYTES:
+                    raise LabHttpTransportError("Oversized LAB response")
+                parts.append(part)
+            raw = b"".join(parts)
             if cookie is not None:
                 self.headers["Cookie"] = cookie
             # Official Espressif HTTP transport uses latin-1 end-to-end
