@@ -111,6 +111,39 @@ production private key on the ESP32-S3 without accidentally burning
 eFuses or erasing the user's only working remote. That must be designed
 and reviewed before production HA identity pinning or trusted pairing.
 
+## Same-session dual-key laboratory review (2026-11-05)
+
+The user has hardware-verified the SRP6a/AES-GCM lab client, candidate HA
+P-256 proof, software-backed device P-256 proof, and the local no-wait
+quota rearm. These facts establish **lab interoperability, not pairing**.
+
+Firmware now has a LAB-only volatile mutual-proof policy. After the
+candidate HA key signature and device software-key signature are
+separately verified **in the same encrypted Security2 session**,
+firmware records their exact public-key SHA-256 fingerprints in RAM,
+rejecting mixed session IDs, duplicate proofs and expired evidence.
+The Waveshare can present the full candidate HA fingerprint across
+four rows and offer `Review OK` or `Reject` for 60 seconds. The
+matching manual Python client prints the **ephemeral public** HA
+fingerprint for an operator to compare. Private keys and the six-digit
+PIN remain undisclosed.
+
+This is a visual, volatile **lab acknowledgement only**. The reference
+Python client may finish and close its socket before the touchscreen
+review; it is therefore *not* live authenticated enrollment. No peer
+credential is persisted, neither NVS nor HA is authorized, no deployment
+or OTA capability is enabled. The firmware contract
+`sec2_lab_mutual_review_contract.json` is pinned by HACS under
+`tests/fixtures/` and CI checks they match. HACS still does not open
+port 18082 or offer a Pair button.
+
+**Not yet hardware-tested:** the new combined fingerprint presentation
+and touchscreen Review OK/Reject path. This must pass firmware CI and
+real Waveshare touch testing before being accepted as laboratory UI
+interoperability. Real protected device identity, persistent HA key,
+live session-held pairing approval, replay-resistant cross-identity
+transcript and revocation are distinct later milestones.
+
 ## Required independent tests before an enabled pairing screen
 
 1. Python version/dependency compatibility with HA 2024.9.1.
