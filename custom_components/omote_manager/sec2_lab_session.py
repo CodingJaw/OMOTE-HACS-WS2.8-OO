@@ -10,6 +10,7 @@ fingerprint is diagnostic only, never a trusted identity or enrollment.
 """
 from __future__ import annotations
 
+import asyncio
 from hashlib import sha256
 import ipaddress
 import json
@@ -20,6 +21,9 @@ from .candidate_identity import CandidateIdentityError, CandidateIdentityStore
 
 _LAB_PORT = 18082
 _LAB_VERSION = "omote-sec2-lab-v1"
+_LAB_TIMEOUT_SECONDS = 8
+_LAB_TOTAL_SECONDS = 40
+_LAB_RESPONSE_MAX = 4096
 _HA_REPLY = b"OMOTE-LAB-HA-PROOF-OK-V1"
 _DEVICE_DOMAIN = b"OMOTE-SEC2-LAB-DEVICE-PROOF-V1"
 _COOKIE = re.compile(r"session=(?:0|[1-9][0-9]{0,9})\Z", re.ASCII)
@@ -88,10 +92,20 @@ async def run_lab_session(
 
     stage = "transport"
     transport = None
-    try:
+
+    async def bounded(endpoint: str, payload):
+        reply = await asyncio.wait_for(
+            transport.send_data(endpoint, payload), timeout=_LAB_TIMEOUT_SECONDS
+        )
+        if not isinstance(reply, str) or len(reply) > _LAB_RESPONSE_MAX:
+            raise ValueError("Invalid or oversized LAB response")
+        return reply
+
+    async def exchange():
+        nonlocal stage, transport
         transport = transport_factory(f"{host}:{_LAB_PORT}")
         stage = "version"
-        raw = await transport.send_data("proto-ver", "-")
+        raw = await bounded("proto-ver", "-")
         if not isinstance(raw, str) or len(raw) > 1024:
             raise ValueError("Invalid lab version")
         metadata = json.loads(raw)["prov"]
@@ -110,14 +124,14 @@ async def run_lab_session(
             request = security.security_session(response)
             if request is None:
                 break
-            response = await transport.send_data("prov-session", request)
+            response = await bounded("prov-session", request)
             if response is None:
                 raise ValueError("Missing Security2 response")
         else:
             raise ValueError("Security2 frame limit")
 
         stage = "encrypted-probe"
-        reply = await transport.send_data(
+        reply = await bounded(
             "omote-probe", security.encrypt_data(b"OMOTE-SEC2-PROBE-V1").decode("latin-1")
         )
         if security.decrypt_data(reply.encode("latin-1")) != b"OMOTE-SEC2-OK-V1":
@@ -129,7 +143,7 @@ async def run_lab_session(
             raise ValueError("Candidate changed")
 
         stage = "candidate-proof"
-        reply = await transport.send_data(
+        reply = await bounded(
             "omote-ha-proof", security.encrypt_data(proof).decode("latin-1")
         )
         if security.decrypt_data(reply.encode("latin-1")) != _HA_REPLY:
@@ -137,7 +151,7 @@ async def run_lab_session(
 
         stage = "device-proof"
         challenge = b"\x01" + secrets.token_bytes(32)
-        reply = await transport.send_data(
+        reply = await bounded(
             "omote-device-proof", security.encrypt_data(challenge).decode("latin-1")
         )
         fingerprint = _device_proof(
@@ -153,6 +167,8 @@ async def run_lab_session(
             "deployment_enabled": False,
             "ota_enabled": False,
         }
+    try:
+        return await asyncio.wait_for(exchange(), timeout=_LAB_TOTAL_SECONDS)
     except Exception:
         raise LabSessionError(stage) from None
     finally:
