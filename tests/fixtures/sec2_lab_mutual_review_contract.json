@@ -1,0 +1,41 @@
+{
+  "contract": "omote-sec2-lab-mutual-review-v1",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "scope": "lab_only_volatile_same_session_proofs_no_trust",
+  "transport": {
+    "scheme": "protocomm-security2-srp6a-aes256gcm",
+    "port": 18082,
+    "local_start_required": true,
+    "window_ms": 120000,
+    "ha_endpoint": "omote-ha-proof",
+    "device_endpoint": "omote-device-proof"
+  },
+  "review": {
+    "required_verified_ha_public_key_proof": true,
+    "required_verified_device_software_key_proof": true,
+    "require_exact_same_security2_session_id": true,
+    "require_full_sha256_ha_fingerprint_on_touchscreen": true,
+    "ha_fingerprint_format": "lowercase_sha256_hex_of_65_byte_sec1_uncompressed_p256_public_key",
+    "touch_review_deadline_ms": 60000,
+    "local_approval_label": "Review OK",
+    "local_reject_label": "Reject",
+    "one_shot_review": true,
+    "volatile_only": true,
+    "remains_valid_after_http_connection_closes": "lab_review_only_not_production_trust"
+  },
+  "rejection": {
+    "session_mismatch": "fail_closed",
+    "duplicate_proof": "fail_closed",
+    "bad_fingerprint": "fail_closed",
+    "touch_before_both_proofs": "refuse",
+    "touch_after_deadline": "refuse"
+  },
+  "authorization": {
+    "ha_pairing_enabled": false,
+    "production_device_identity_verified": false,
+    "durable_trust_written": false,
+    "device_config_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false
+  }
+}
