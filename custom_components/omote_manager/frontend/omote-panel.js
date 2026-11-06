@@ -18,6 +18,8 @@ class OmoteManagerPanel extends HTMLElement {
     this._capabilityEntry = null;
     this._pairingRequest = 0;
     this._pairingEntry = null;
+    this._candidateEntry = null;
+    this._candidateRequest = 0;
     this.workspace = null;
     // Versioned panel name prevents HA from retaining older custom elements.
   }
@@ -67,6 +69,12 @@ class OmoteManagerPanel extends HTMLElement {
       '      </div>' +
       '      <div id="capability-inspector" class="capability-inspector" role="status" aria-live="polite">Select a remote to check firmware security features.</div>' +
       '      <div id="pairing-inspector" class="capability-inspector" role="status" aria-live="polite">Pairing has not been checked. This screen cannot start pairing.</div>' +
+      '      <section id="candidate-identity-inspector" class="capability-inspector" aria-label="Local Home Assistant candidate identity">' +
+      '        <strong>Home Assistant candidate identity — NOT PAIRED</strong>' +
+      '        <p id="candidate-identity-status" role="status" aria-live="polite">Select a remote to inspect local key preparation.</p>' +
+      '        <button type="button" id="prepare-ha-candidate" class="secondary" disabled>Prepare HA key locally</button>' +
+      '        <p class="muted">No remote pairing or configuration writes. HA local .storage is not encrypted at rest; full HA backups can contain candidate key material.</p>' +
+      '      </section>' +
       '      <div id="categories" class="categories" aria-label="Configuration categories"></div>' +
       '      <div class="content-grid">' +
       '        <section class="file-pane"><h3>Configuration files</h3><div id="file-list"></div></section>' +
@@ -95,6 +103,9 @@ class OmoteManagerPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("inspect-pairing").addEventListener("click", () => {
       void this.inspectPairing();
+    });
+    this.shadowRoot.getElementById("prepare-ha-candidate").addEventListener("click", () => {
+      void this.prepareHaCandidate();
     });
     this.shadowRoot.getElementById("nav-overview").addEventListener("click", () => {
       this._navigateTo("overview");
@@ -289,6 +300,15 @@ class OmoteManagerPanel extends HTMLElement {
         remote ? "Select Check pairing readiness. Pairing itself remains disabled."
           : "Select a remote to inspect pairing readiness.";
     }
+    if (this._candidateEntry !== (remote ? remote.entry_id : null)) {
+      this._candidateEntry = remote ? remote.entry_id : null;
+      this._candidateRequest++;
+      this.shadowRoot.getElementById("prepare-ha-candidate").disabled = !remote;
+      this.shadowRoot.getElementById("candidate-identity-status").textContent =
+        remote ? "Checking whether a candidate HA key already exists…"
+          : "Select a remote to inspect local key preparation.";
+      if (remote) void this.inspectHaCandidate();
+    }
     const categories = this.shadowRoot.getElementById("categories");
     categories.replaceChildren();
     const files = remote ? remote.files || [] : [];
@@ -481,6 +501,72 @@ class OmoteManagerPanel extends HTMLElement {
         String(error.message || error) + ". Pairing and deployment remain disabled.";
     } finally {
       if (request === this._pairingRequest &&
+          remote.entry_id === this._selectedRemote) button.disabled = false;
+    }
+  }
+
+  async inspectHaCandidate() {
+    const remote = this.selectedRemote();
+    if (!remote || !this._hass) return;
+    const request = ++this._candidateRequest;
+    const view = this.shadowRoot.getElementById("candidate-identity-status");
+    try {
+      const info = await this._hass.callWS({
+        type: "omote_manager/pairing/candidate/status",
+        entry_id: remote.entry_id
+      });
+      if (request !== this._candidateRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      if (info.prepared) {
+        view.textContent = "Prepared locally; NOT PAIRED. HA public-key SHA-256: " +
+          info.fingerprint + ". No remote trust or deployment enabled.";
+      } else {
+        view.textContent = "No candidate HA key has been prepared. This action " +
+          "only creates a per-remote local identity; it cannot pair or deploy.";
+      }
+    } catch (_error) {
+      if (request !== this._candidateRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      view.textContent = "Candidate identity storage unavailable or invalid. " +
+        "It will not be silently replaced; normal read-only OMOTE remains available.";
+      this.shadowRoot.getElementById("prepare-ha-candidate").disabled = true;
+    }
+  }
+
+  async prepareHaCandidate() {
+    const remote = this.selectedRemote();
+    const button = this.shadowRoot.getElementById("prepare-ha-candidate");
+    if (!remote || !this._hass || button.disabled) return;
+    // A separate explicit administrator action prepares only a candidate key.
+    // Confirmation is NOT on-device peer approval and can NEVER grant trust.
+    if (!window.confirm(
+      "Prepare a P-256 HA candidate key for this remote?\n\n" +
+      "This is NOT pairing and will not contact or change the remote. " +
+      "The private key is stored in local Home Assistant .storage, " +
+      "which is NOT encrypted at rest and may be included in HA backups. " +
+      "Only proceed if you accept this laboratory-storage limitation."
+    )) return;
+    const request = ++this._candidateRequest;
+    button.disabled = true;
+    const view = this.shadowRoot.getElementById("candidate-identity-status");
+    view.textContent = "Preparing candidate HA identity in Home Assistant only…";
+    try {
+      const info = await this._hass.callWS({
+        type: "omote_manager/pairing/candidate/prepare",
+        entry_id: remote.entry_id
+      });
+      if (request !== this._candidateRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      view.textContent = (info.created ? "Created" : "Already prepared") +
+        " local HA candidate identity. SHA-256 public fingerprint: " +
+        info.fingerprint + ". NOT PAIRED; no remote writes or deployment.";
+    } catch (_error) {
+      if (request !== this._candidateRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      view.textContent = "Candidate key preparation failed. No remote changes; " +
+        "the stored identity must be checked before retrying.";
+    } finally {
+      if (request === this._candidateRequest &&
           remote.entry_id === this._selectedRemote) button.disabled = false;
     }
   }
