@@ -292,3 +292,51 @@ Espressif reference: https://github.com/espressif/esp-idf/tree/release/v5.3/tool
 Security advisory: https://github.com/espressif/esp-idf/security/advisories/GHSA-9r76-858f-v6jh
 Related firmware contract: `docs/CONFIG_V2_SECURITY2_INTEROP_GATE.md` on
 `feature/config-v2-transactional`.
+
+
+## 2026-11-06 — isolated persistent-candidate Security2 laboratory adapter
+
+HACS `main` now includes `custom_components/omote_manager/sec2_lab_session.py`
+and `tests/test_sec2_lab_session.py`. This adapter is **not imported or
+registered in Home Assistant's runtime startup or WebSocket handlers**.
+It is opt-in test infrastructure, not a supported Pair action.
+
+When called explicitly by future tightly scoped *server-side* laboratory
+tooling, it requires affirmative `ack_lab_only`, a literal IPv4 host,
+a six-digit locally displayed PIN, a previously prepared HA candidate
+identity, and caller-injected **official ESP-IDF** Security2 and HTTP
+transport factories. It then checks the lab version, performs bounded
+Security2 negotiation, validates an encrypted fixed probe, sends the
+existing persistent HA candidate's per-session P-256 signature frame,
+and verifies an encrypted per-session challenge signature by the
+device's **unprotected experimental NVS software key**.
+
+The device public-key fingerprint is returned only as an **untrusted
+laboratory observation**. Nothing pins it, persists peer trust, or
+authorizes pairing, credential changes, deployment, OTA or recovery
+writes. Errors expose a stage name rather than PIN, ciphertext,
+session cookie or raw device output. Responses are bounded to 4096
+characters, per-exchange deadlines are 8 seconds, and a single overall
+attempt is limited to 40 seconds. There is **no automatic retry**;
+the firmware's persistent Security2 attempt budget remains applicable.
+
+The offline tests cover exact cookie parsing, actual P-256 device
+signatures and session/nonce replay rejection, explicit-consent and
+preflight rejection without a network connection, successful
+mocked end-to-end exchange, invalid HA receipts, corrupted device
+signatures, oversized replies, and an explicit check that no runtime
+HACS WebSocket registration was added.
+
+**Hardware acceptance is still pending.** The official Espressif Python
+client modules are **not packaged as HACS runtime dependencies**;
+there is deliberately no production or UI execution path. Before
+registering a deliberately initiated admin-only lab operation, review
+exact HA 2024.9.1 Python dependencies, HTTP transport cancellation,
+redirect behavior, concurrent attempts and a short-lived PIN handling
+boundary. The standalone ephemeral-key Python lab client and the
+normal HACS read-only integration are unchanged.
+
+The firmware `feature/config-v2-transactional` branch and all eFuses
+remain unchanged. Protected device identity, live session-held
+fingerprint approval, durable trust, re-pairing and PIN-free reconnect
+are not yet implemented.
