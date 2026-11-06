@@ -2,7 +2,7 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Development build 0.1.0-dev20 — safe pairing-readiness inspection and shared Config v2 Security2 contract; actual pairing, encryption sessions, and firmware deployments are not enabled.**
+**Current development build: 0.1.0-dev22 (branch `main`).** OMOTE Manager supports an administrator-prepared persistent **candidate HA P-256 identity per remote**, read-only firmware pairing readiness, and Config v2 Security2 lab protocol contracts. **HACS does not establish encrypted Security2 sessions or trusted pairing, and firmware deployment/OTA remain disabled.** The experimental Waveshare Security2 listener is a separate, touchscreen-initiated laboratory feature.
 
 **Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
@@ -283,7 +283,25 @@ or rollback becomes enabled**.
 
 ### If the editor is missing after updating
 
-Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev20, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+Home Assistant's browser can retain a previously registered JavaScript custom element even after the server is upgraded. This release uses a new versioned element tag to avoid stale constructors. After installing v0.1.0-dev22, restart Home Assistant and perform a **hard browser reload** (Ctrl+Shift+R). If Profile Studio does not appear, use the top **Profile Studio** button; its loading/error state should be visible, and the browser console will identify JavaScript failures.
+
+## HACS dev22 — local candidate HA identity (not paired)
+
+Select a registered OMOTE remote in **OMOTE Manager**, then use
+**Prepare HA key locally** to generate a persistent per-remote P-256
+candidate identity **only after administrator confirmation**. The public
+SHA-256 fingerprint can be inspected in the sidebar and should remain
+unchanged across normal HA restarts. Repeated preparation never rotates
+an existing valid key.
+
+This action does **not** contact the remote, open a Security2 session,
+pair or trust Home Assistant, or authorize configuration writes.
+The private candidate key is kept in HA's local `.storage` and **is not
+guaranteed encrypted at rest**; a full HA backup may contain it.
+No key material is returned to the browser. See
+[the Security2 interoperability plan](docs/PAIRING_SECURITY2_INTEROP_PLAN.md)
+for the protected-device-key and live-session approval gates still
+needed before PIN-free reconnection.
 
 ## Development roadmap
 
