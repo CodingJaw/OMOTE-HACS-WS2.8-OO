@@ -469,7 +469,8 @@ class OmoteManagerPanel extends HTMLElement {
         : "Firmware pairing API: not available";
       const details = document.createElement("p");
       details.textContent = "Scheme: " + (info.scheme || "none") +
-        " · Encrypted session: NOT ACTIVE · Pairing: DISABLED · Deployment: DISABLED";
+        " · Production encrypted session: NOT AVAILABLE" +
+        " · Pairing: DISABLED · Deployment: DISABLED";
       const explanation = document.createElement("p");
       explanation.textContent = info.explanation || "Secure pairing is not available.";
       view.replaceChildren(title, details, explanation);
