@@ -65,6 +65,18 @@ jobs:
           upstream = json.loads(Path('/tmp/omote-contract/lab-device-identity.json').read_text())
           assert local == upstream, 'Firmware and HACS LAB device identity contracts differ'
           PY
+      - name: Compare firmware LAB mutual-key proof review contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/fd491dcb88ec51f2e55fcbec5704ebfdd6f5540c/Platformio/tools/config-v2-tests/sec2_lab_mutual_review_contract.json \
+            -o /tmp/omote-contract/lab-mutual-review.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          local = json.loads(Path('tests/fixtures/sec2_lab_mutual_review_contract.json').read_text())
+          upstream = json.loads(Path('/tmp/omote-contract/lab-mutual-review.json').read_text())
+          assert local == upstream, 'Firmware and HACS LAB mutual review contracts differ'
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
@@ -73,6 +85,7 @@ jobs:
           OMOTE_FIRMWARE_PAIRING_CONTRACT: /tmp/omote-contract/pairing.json
           OMOTE_FIRMWARE_LAB_PROOF_CONTRACT: /tmp/omote-contract/lab-ha-proof.json
           OMOTE_FIRMWARE_LAB_DEVICE_CONTRACT: /tmp/omote-contract/lab-device-identity.json
+          OMOTE_FIRMWARE_LAB_MUTUAL_REVIEW_CONTRACT: /tmp/omote-contract/lab-mutual-review.json
         run: python -m unittest discover -s tests -v
       - name: Validate sidebar JavaScript
         run: |
