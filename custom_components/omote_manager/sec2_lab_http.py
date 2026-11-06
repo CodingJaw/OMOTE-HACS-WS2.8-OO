@@ -59,7 +59,7 @@ class LabHttpTransport:
     async def send_data(self, endpoint: str, payload: bytes | str) -> str:
         if self._closed:
             raise LabHttpTransportError("Closed LAB transport")
-        if endpoint not in _ALLOWED_ENDPOINTS or type(endpoint) is not str:
+        if type(endpoint) is not str or endpoint not in _ALLOWED_ENDPOINTS:
             raise LabHttpTransportError("Unexpected LAB endpoint")
         if type(payload) is str:
             try:
