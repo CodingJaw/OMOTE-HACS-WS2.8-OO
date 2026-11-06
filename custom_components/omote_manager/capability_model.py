@@ -118,7 +118,8 @@ def summarize_capabilities(payload: dict | None) -> dict[str, Any]:
         "preview_only": version.endswith("-preview"),
         "deployment_enabled": False,
         "explanation": (
-            "Read-only v2 preview; secure pairing and deployment are not implemented."
+            "Production v2 is read-only: trusted pairing and deployment are not implemented. " \
+            "A separate experimental Security2 LAB listener is not represented by this endpoint."
             if version.endswith("-preview") else
             "Firmware advertises v2 features, but deployment remains disabled "
             "until authenticated transactions and physical recovery are approved."
