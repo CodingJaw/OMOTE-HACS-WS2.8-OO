@@ -20,6 +20,9 @@ class OmoteManagerPanel extends HTMLElement {
     this._pairingEntry = null;
     this._candidateEntry = null;
     this._candidateRequest = 0;
+    this._labEntry = null;
+    this._labRequest = 0;
+    this._labAvailable = false;
     this.workspace = null;
     // Versioned panel name prevents HA from retaining older custom elements.
   }
@@ -40,7 +43,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev22">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev23">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -75,6 +78,14 @@ class OmoteManagerPanel extends HTMLElement {
       '        <button type="button" id="prepare-ha-candidate" class="secondary" disabled>Prepare HA key locally</button>' +
       '        <p class="muted">No remote pairing or configuration writes. HA local .storage is not encrypted at rest; full HA backups can contain candidate key material.</p>' +
       '      </section>' +
+      '      <section id="sec2-lab-inspector" class="capability-inspector" aria-label="Experimental encrypted laboratory test">' +
+      '        <strong>Security2 encrypted LAB — NOT PAIRED</strong>' +
+      '        <p id="lab-status" role="status" aria-live="polite">Select a remote to inspect LAB prerequisites.</p>' +
+      '        <button type="button" id="lab-check" class="secondary" disabled>Check LAB prerequisites</button>' +
+      '        <button type="button" id="lab-run" class="secondary" disabled>Run encrypted LAB test</button>' +
+      '        <p class="muted">Opt-in experimental mode only. Requires physical Start lab and a fresh six-digit PIN. ' +
+      '        No permanent trust, remote configuration writes, OTA, or eFuse changes. Use an HTTPS Home Assistant connection when entering a PIN.</p>' +
+      '      </section>' +
       '      <div id="categories" class="categories" aria-label="Configuration categories"></div>' +
       '      <div class="content-grid">' +
       '        <section class="file-pane"><h3>Configuration files</h3><div id="file-list"></div></section>' +
@@ -106,6 +117,12 @@ class OmoteManagerPanel extends HTMLElement {
     });
     this.shadowRoot.getElementById("prepare-ha-candidate").addEventListener("click", () => {
       void this.prepareHaCandidate();
+    });
+    this.shadowRoot.getElementById("lab-check").addEventListener("click", () => {
+      void this.inspectLabReadiness();
+    });
+    this.shadowRoot.getElementById("lab-run").addEventListener("click", () => {
+      void this.runEncryptedLabTest();
     });
     this.shadowRoot.getElementById("nav-overview").addEventListener("click", () => {
       this._navigateTo("overview");
@@ -308,6 +325,17 @@ class OmoteManagerPanel extends HTMLElement {
         remote ? "Checking whether a candidate HA key already exists…"
           : "Select a remote to inspect local key preparation.";
       if (remote) void this.inspectHaCandidate();
+    }
+    if (this._labEntry !== (remote ? remote.entry_id : null)) {
+      this._labEntry = remote ? remote.entry_id : null;
+      this._labRequest++;
+      this._labAvailable = false;
+      this.shadowRoot.getElementById("lab-check").disabled = !remote;
+      this.shadowRoot.getElementById("lab-run").disabled = true;
+      this.shadowRoot.getElementById("lab-status").textContent =
+        remote ? "Check whether this HA host has opted into the Security2 LAB."
+          : "Select a remote to inspect LAB prerequisites.";
+      if (remote) void this.inspectLabReadiness();
     }
     const categories = this.shadowRoot.getElementById("categories");
     categories.replaceChildren();
@@ -571,6 +599,97 @@ class OmoteManagerPanel extends HTMLElement {
     }
   }
 
+
+  async inspectLabReadiness() {
+    const remote = this.selectedRemote();
+    if (!remote || !this._hass) return;
+    const request = ++this._labRequest;
+    const check = this.shadowRoot.getElementById("lab-check");
+    const run = this.shadowRoot.getElementById("lab-run");
+    const status = this.shadowRoot.getElementById("lab-status");
+    check.disabled = true;
+    run.disabled = true;
+    this._labAvailable = false;
+    status.textContent = "Checking opt-in HA laboratory settings…";
+    try {
+      const info = await this._hass.callWS({
+        type: "omote_manager/pairing/lab/readiness",
+        entry_id: remote.entry_id
+      });
+      if (request !== this._labRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      this._labAvailable = info.can_attempt === true;
+      run.disabled = !this._labAvailable || !remote.online;
+      status.textContent = !info.enabled
+        ? "LAB disabled on the HA host. To opt in, configure OMOTE_SEC2_LAB_ENABLE=1 and restart HA. No pairing is enabled."
+        : !info.idf_path_configured
+          ? "LAB enabled, but the HA host has no ESP-IDF IDF_PATH. No network attempt is available."
+          : !info.registered_lan_ipv4
+            ? "LAB requires a registered remote with a private LAN IPv4 address."
+            : "LAB host settings are configured. Press Start lab on the Waveshare, then run one encrypted test with the screen PIN. NOT PAIRED.";
+    } catch (_error) {
+      if (request !== this._labRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      status.textContent = "LAB diagnostics are unavailable. No pairing or remote write enabled.";
+    } finally {
+      if (request === this._labRequest &&
+          remote.entry_id === this._selectedRemote) check.disabled = false;
+    }
+  }
+
+  async runEncryptedLabTest() {
+    const remote = this.selectedRemote();
+    const button = this.shadowRoot.getElementById("lab-run");
+    if (!remote || !remote.online || !this._labAvailable || !this._hass ||
+        button.disabled) return;
+    if (!window.confirm(
+      "Run one experimental Security2 LAB exchange on the selected Waveshare?\n\n" +
+      "First physically open Settings > SEC2 encrypted LAB test > Start lab. " +
+      "Each handshake spends flash-persistent LAB message quota and can require physical Rearm lab. " +
+      "The current device software key is NOT hardware protected. " +
+      "This test DOES NOT pair or authorize deployment. " +
+      "Use an HTTPS Home Assistant connection before entering the PIN."
+    )) return;
+    let pin = window.prompt("Enter the six-digit code currently shown on the Waveshare (never share or log it):", "");
+    if (pin === null) return;
+    if (!/^[0-9]{6}$/.test(pin)) {
+      pin = "";
+      this.shadowRoot.getElementById("lab-status").textContent =
+        "A six-digit touchscreen PIN is required. No LAB request was made.";
+      return;
+    }
+    const request = ++this._labRequest;
+    const status = this.shadowRoot.getElementById("lab-status");
+    button.disabled = true;
+    status.textContent = "Performing a single encrypted LAB exchange. Do not repeat unnecessarily…";
+    try {
+      const result = await this._hass.callWS({
+        type: "omote_manager/pairing/lab/test", entry_id: remote.entry_id,
+        pin: pin, ack_lab_only: true
+      });
+      if (request !== this._labRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      status.textContent =
+        "LAB ONLY: encrypted probe and session-bound identity proofs passed. " +
+        "HA public fingerprint: " + result.candidate_ha_fingerprint +
+        ". Untrusted Waveshare software-key fingerprint: " +
+        result.untrusted_device_fingerprint +
+        ". Compare the HA fingerprint with all four rows on the Waveshare, then use Review OK or Reject. " +
+        "NOT PAIRED; no trusted credential, config deployment, OTA or eFuse changes.";
+    } catch (_error) {
+      if (request !== this._labRequest ||
+          remote.entry_id !== this._selectedRemote) return;
+      status.textContent =
+        "LAB attempt could not complete. Review non-secret Home Assistant diagnostics; " +
+        "do not retry automatically because the firmware has a persistent message quota. " +
+        "No trusted pairing or configuration write was enabled.";
+    } finally {
+      pin = "";
+      if (request === this._labRequest &&
+          remote.entry_id === this._selectedRemote) button.disabled = false;
+    }
+  }
+
   async backupSelected() {
     const remote = this.selectedRemote();
     if (!remote || !this._hass) return;
@@ -595,6 +714,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v22")) {
-  customElements.define("omote-manager-panel-v22", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v23")) {
+  customElements.define("omote-manager-panel-v23", OmoteManagerPanel);
 }
