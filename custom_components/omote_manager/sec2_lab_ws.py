@@ -53,7 +53,8 @@ def _local_host(entry) -> str:
     if type(host) is not str:
         raise ValueError("Invalid registered host")
     ip = ipaddress.IPv4Address(host)
-    if not ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
+    if (not ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_multicast or ip.is_unspecified or ip.is_reserved):
         raise ValueError("LAB only supports registered local IPv4 hosts")
     return str(ip)
 
