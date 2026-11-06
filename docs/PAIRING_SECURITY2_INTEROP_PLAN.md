@@ -144,6 +144,75 @@ interoperability. Real protected device identity, persistent HA key,
 live session-held pairing approval, replay-resistant cross-identity
 transcript and revocation are distinct later milestones.
 
+## HA dev22 — persistent local candidate identity per remote (2026-11-05)
+
+The HACS development integration now implements a local-only,
+administrator-prepared P-256 *candidate* identity per registered OMOTE
+entry. It is **NOT paired or trusted** and remains disconnected from
+firmware Security2 until the protected-key/live-session pairing gate
+has been reviewed.
+
+Implementation:
+- `candidate_identity.py` stores one canonical PKCS#8 DER private key
+  (base64-encoded) and its SHA-256 fingerprint of the 65-byte P-256
+  SEC1 public key in HA's separate `.storage/omote_manager.candidate_identities`
+  via the Home Assistant `Store` API.
+- **Important:** HA `.storage` is **not guaranteed encrypted at rest**.
+  A full HA backup (or disk access) may copy this candidate private
+  key. This is a development candidate, not a hardware-protected
+  credential. Protect HA backup archives and the operating-system
+  filesystem; no private key appears in portable OMOTE JSON profile
+  backups, browser replies or logs. A new installation without a
+  restored key generates a new candidate; restoring the HA backup
+  can restore the old key.
+- Keys are created only by the explicit, admin-only OMOTE Manager
+  **Prepare HA key locally** button and confirmation. A read-only
+  **status** displays the public fingerprint. There is NO automatic
+  key creation at HA startup, no implicit key rotation, no browser
+  access to private DER, and no signing API exposed to WebSocket.
+- The local identity source can produce an offline, domain-bound
+  P-256 ECDSA proof in the preexisting encrypted LAB candidate-HA
+  frame format, including a fresh random nonce and the exact
+  Security2 session identifier. This method is NOT connected to
+  an actual network transport. Tests verify real ECDSA signatures,
+  fingerprint stability across HA restart, distinct per-remote
+  identities, and fail-closed corrupted/wrong-version/failed-save
+  behavior.
+- HACS main bumped to **0.1.0-dev22** for a new sidebar element
+  and cache-busting frontend assets.
+
+The local WebSockets `omote_manager/pairing/candidate/status` and
+`.../prepare` check administrator privileges and registered remote
+entry IDs; they return **only non-secret fingerprint/status fields**
+and never contact the remote or authorize configuration writes.
+
+The separate six-digit lab Python command still generates a NEW
+ephemeral key on each invocation and still requires the on-screen
+code. Preparing a persistent candidate key in HACS does **not**
+turn that CLI into permanent pairing.
+
+### Remaining blockers for real PIN-free reconnection
+
+1. Establish **protected** Waveshare device private-key storage,
+   flash/NVS threat model, recovery/rotation procedure and verified
+   physical provisioning, without unauthorized eFuse changes.
+2. Implement a HACS-originated Security2 session bound to the
+   saved per-remote HA candidate P-256 key **and** a pinned,
+   cryptographically verified protected device identity, including
+   server-authenticated anti-MITM and replay-safe transcript binding.
+3. Hold a live authenticated connection while the actual
+   touchscreen compares the verified HA fingerprint, then store
+   the approved HA public identity durably with readback and
+   rollback/error handling. A stale or closed lab socket can never
+   approve persistent trust.
+4. Prove an authenticated, PIN-less reconnection after HA/Waveshare
+   restart and a fresh-pairing requirement following explicit
+   removal or clean HA reinstall. A full HA backup restore needs
+   explicit identity/ownership handling.
+5. Keep **all configuration deployment and OTA disabled** until
+   separately authenticated admin action, fresh device touch
+   approval of the exact proposed transaction and hardware rollback.
+
 ## Required independent tests before an enabled pairing screen
 
 1. Python version/dependency compatibility with HA 2024.9.1.
