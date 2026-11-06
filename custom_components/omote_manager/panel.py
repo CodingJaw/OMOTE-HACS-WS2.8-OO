@@ -19,12 +19,13 @@ from .api import OmoteApiError
 from .const import DOMAIN
 from .safe_files import is_exportable_json
 from .candidate_identity_ws import register_candidate_identity_websockets
+from .sec2_lab_ws import register_lab_websockets
 from .workspace_ws import register_workspace_websockets
 
 PANEL_PATH = "omote-manager"
-PANEL_ELEMENT = "omote-manager-panel-v22"
+PANEL_ELEMENT = "omote-manager-panel-v23"
 STATIC_PATH = "/omote_manager_static"
-ASSET_VERSION = "0.1.0-dev22"
+ASSET_VERSION = "0.1.0-dev23"
 
 
 async def async_register_manager_panel(hass: HomeAssistant) -> None:
@@ -39,6 +40,7 @@ async def async_register_manager_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_pairing_status)
     register_workspace_websockets(hass)
     register_candidate_identity_websockets(hass)
+    register_lab_websockets(hass)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_PATH,
