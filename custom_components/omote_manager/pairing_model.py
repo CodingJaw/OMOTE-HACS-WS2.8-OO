@@ -58,9 +58,11 @@ def summarize_pairing_status(payload: dict[str, Any] | None) -> dict[str, Any]:
         "device_identity_verified": False,
         "deployment_enabled": False,
         "explanation": (
-            "Security2 SRP6a/AES-GCM is planned and ephemeral SRP material is "
-            "being implemented in the firmware feature branch. No encrypted "
-            "pairing listener, peer identity verification, or trusted session "
-            "is available yet."
+            "The port-80 endpoint reports PRODUCTION pairing only: no trusted "
+            "session, verified device identity, or configuration authorization "
+            "is available. An independent opt-in Security2 LAB listener may "
+            "operate on port 18082 after local touchscreen activation. That "
+            "experimental listener is not monitored by this status API and "
+            "must not be interpreted as a paired Home Assistant device."
         ),
     }
