@@ -2,8 +2,8 @@
 
 This endpoint does NOT pair, persist trust, update NVS, deploy configs or OTA.
 It is available only when OMOTE_SEC2_LAB_ENABLE=1 is set in HA's own
-environment and a compatible ESP-IDF source checkout is available via
-IDF_PATH. No arbitrary target IP is accepted from the browser.
+environment. Espressif Security2 is bundled under the OMOTE namespace;
+no IDF_PATH or runtime download is used. No browser target IP is accepted.
 """
 from __future__ import annotations
 
@@ -68,7 +68,6 @@ async def ws_lab_readiness(hass: HomeAssistant, connection, msg: dict):
     entry = _admin_and_entry(hass, connection, msg)
     if entry is None:
         return
-    configured = bool(os.environ.get("IDF_PATH"))
     try:
         _local_host(entry)
         valid_host = True
@@ -77,9 +76,9 @@ async def ws_lab_readiness(hass: HomeAssistant, connection, msg: dict):
     connection.send_result(msg["id"], {
         "lab_only": True,
         "enabled": _enabled(),
-        "idf_path_configured": configured,
+        "security2_client": "bundled-esp-idf-v5.4.2",
         "registered_lan_ipv4": valid_host,
-        "can_attempt": _enabled() and configured and valid_host,
+        "can_attempt": _enabled() and valid_host,
         "paired": False,
         "trusted": False,
         "deployment_enabled": False,
