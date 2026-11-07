@@ -32,7 +32,13 @@ class PairingLifecycleTests(unittest.TestCase):
                              json.loads(Path(reference).read_text()))
         contract = json.loads(CONTRACT.read_text())
         self.assertEqual(contract["states"], [item.value for item in policy.State])
-        self.assertFalse(any(contract["authorization"].values()))
+        self.assertTrue(contract["authorization"]["laboratory_only"])
+        production = {
+            name: enabled for name, enabled in contract["authorization"].items()
+            if name != "laboratory_only"
+        }
+        self.assertTrue(production)
+        self.assertFalse(any(production.values()))
         self.assertTrue(contract["rules"]["require_device_identity_hardware_protection_before_trust"])
 
     def test_real_lab_review_does_not_grant_trust(self):
