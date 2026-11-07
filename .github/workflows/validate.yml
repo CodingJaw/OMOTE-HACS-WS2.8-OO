@@ -121,6 +121,19 @@ jobs:
           assert all(value is False for key, value in hacs['authorization'].items() if key != 'laboratory_only')
           assert hacs['scope'] == 'offline_signed_receipt_verification_only'
           PY
+      - name: Compare signed receipt fixed interoperability vectors
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/49760eac7acd4f070aa567c3f1f559f3a12a0624/Platformio/tools/config-v2-tests/enrollment_receipt_vectors_v1.json \
+            -o /tmp/omote-contract/enrollment-receipt-vectors.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('/tmp/omote-contract/enrollment-receipt-vectors.json').read_text())
+          b=json.loads(Path('tests/fixtures/enrollment_receipt_vectors_v1.json').read_text())
+          assert a==b, 'Signed receipt interoperability test vectors differ'
+          assert len(b['vectors'])==2
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
