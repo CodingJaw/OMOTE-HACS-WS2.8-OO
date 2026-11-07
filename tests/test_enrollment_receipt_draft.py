@@ -68,6 +68,7 @@ class SignedReceiptTests(unittest.TestCase):
         if path:
             self.assertEqual(obj, json.loads(Path(path).read_text()))
         self.assertEqual(set(obj["body_fields"]), receipt.BODY_FIELDS)
+        self.assertEqual(obj["domain"].encode("ascii"), receipt.DOMAIN)
         self.assertTrue(obj["authorization"]["laboratory_only"])
         self.assertFalse(any(value for key, value in obj["authorization"].items()
                              if key != "laboratory_only"))
