@@ -1,0 +1,61 @@
+{
+  "contract": "omote-enrollment-receipt-v1-draft",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "scope": "offline_signed_receipt_verification_only",
+  "domain": "OMOTE-ENROLLMENT-RECEIPT-V1\\n",
+  "body_fields": [
+    "version",
+    "tx_id",
+    "device_id",
+    "epoch",
+    "ha_key_sha256",
+    "device_key_sha256",
+    "session_transcript_sha256",
+    "nonce",
+    "signer",
+    "phase"
+  ],
+  "envelope_fields": [
+    "body",
+    "signature_der_hex"
+  ],
+  "version": "omote-enrollment-receipt-v1-draft",
+  "signers": [
+    "ha",
+    "device"
+  ],
+  "phases": [
+    "prepare",
+    "commit_intent",
+    "peer_confirmed"
+  ],
+  "signature": "ecdsa_p256_sha256_der_over_domain_prefixed_canonical_ascii_json",
+  "public_key": "65_byte_sec1_uncompressed_p256_point_externally_verified",
+  "session_binding": "sha256_of_canonical_authenticated_security2_transcript_supplied_by_verified_channel",
+  "unique_nonce": "128_bit_random_per_signed_receipt",
+  "replay_rule": "reject_repeated_signer_phase_nonce",
+  "reconciliation": "both_peers_signed_matching_tx_epoch_fingerprints_and_session_binding_required_for_diagnostic_peer_confirmed;never_trust",
+  "authorization": {
+    "laboratory_only": true,
+    "receipt_production_enabled": false,
+    "production_paired": false,
+    "persistent_trust_enabled": false,
+    "authenticated_reconnect_enabled": false,
+    "device_config_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  },
+  "acceptance": [
+    "forged_signatures_fail",
+    "tampered_phase_fails",
+    "wrong_public_key_fails",
+    "wrong_session_binding_fails",
+    "mismatched_peer_fingerprints_fail",
+    "duplicate_nonce_fails",
+    "missing_second_peer_receipt_pending",
+    "lost_receipt_remains_untrusted",
+    "software_lab_key_not_hardware_protected",
+    "cross_repo_contract_identical"
+  ]
+}
