@@ -67,9 +67,6 @@ class SignedReceiptTests(unittest.TestCase):
         path = os.getenv("OMOTE_FIRMWARE_ENROLLMENT_RECEIPT_CONTRACT")
         if path:
             self.assertEqual(obj, json.loads(Path(path).read_text()))
-        self.assertEqual(obj["body_fields"], sorted(receipt.BODY_FIELDS)
-                         if obj["body_fields"] == sorted(receipt.BODY_FIELDS)
-                         else obj["body_fields"])
         self.assertEqual(set(obj["body_fields"]), receipt.BODY_FIELDS)
         self.assertTrue(obj["authorization"]["laboratory_only"])
         self.assertFalse(any(value for key, value in obj["authorization"].items()
