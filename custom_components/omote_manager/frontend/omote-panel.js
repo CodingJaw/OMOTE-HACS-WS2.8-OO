@@ -43,7 +43,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev23">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev24">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -154,7 +154,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev23");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev24");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -715,6 +715,6 @@ class OmoteManagerPanel extends HTMLElement {
 
 // Use a new element tag for each incompatible UI revision. Earlier frontend
 // sessions can retain old custom-element constructors until a browser reload.
-if (!customElements.get("omote-manager-panel-v23")) {
-  customElements.define("omote-manager-panel-v23", OmoteManagerPanel);
+if (!customElements.get("omote-manager-panel-v24")) {
+  customElements.define("omote-manager-panel-v24", OmoteManagerPanel);
 }
