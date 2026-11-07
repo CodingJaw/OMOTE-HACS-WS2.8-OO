@@ -1,0 +1,51 @@
+{
+  "contract": "omote-sec2-tx-v2-live-lab-wire-v1",
+  "scope": "opt_in_physically_started_encrypted_lab_only_no_trust",
+  "platformio_environment": "waveshare28v2_omote_sec2_tx_v2_lab",
+  "transport": {
+    "port": 18082,
+    "scheme": "protocomm-security2-srp6a-aes256gcm",
+    "timeout_ms": 120000,
+    "transaction_timeout_ms": 30000
+  },
+  "endpoints": {
+    "open": "omote-tx2-open",
+    "commit": "omote-tx2-commit"
+  },
+  "open": {
+    "request": "u8_version_2|ha_public_sec1_65|ha_nonce_32",
+    "response": "u8_version_2|u32_be_session_cookie|u32_be_epoch_1|tx_id_random_16|u8_device_id_len_8|device_id_8|device_public_sec1_65|device_challenge_random_32"
+  },
+  "commit": {
+    "request": "u8_version_2|u8_ha_der_len_8_80|ha_der_p256_signature",
+    "response": "u8_version_2|u8_device_der_len_8_80|device_der_p256_signature|transcript_sha256_32"
+  },
+  "context": "sec2_mutual_transaction_proof_v2_contract.json canonical_context_layout",
+  "signed_messages": {
+    "ha": "ASCII('OMOTE-SEC2-TX-PROOF-HA-V2\\n') || canonical_context",
+    "device": "ASCII('OMOTE-SEC2-TX-PROOF-DEVICE-V2\\n') || canonical_context"
+  },
+  "reply_digest": "SHA256(ASCII('OMOTE-SEC2-TX-TRANSCRIPT-V2\\n') || context || u8_ha_len || ha_der || u8_device_len || device_der)",
+  "device_id": "first_8_bytes_SHA256(device_public_sec1_65)",
+  "epoch": 1,
+  "constraints": [
+    "session_id_taken_only_from_decrypted_protocomm_callback",
+    "single_pending_volatile_transaction_no_persistence",
+    "open_requires_uncompressed_valid_p256_ha_point",
+    "commit_rejects_other_session_or_expired_transaction",
+    "transaction_id_device_challenge_generated_on_remote",
+    "commit_verifies_ha_signature_before_signing_with_local_lab_device_key",
+    "client_verifies_device_signature_and_digest_independently",
+    "nothing_starts_network_without_settings_touch",
+    "no_touch_approval_or_ha_admin_approval_are_proven_by_this_wire_exchange"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "permanent_pairing_enabled": false,
+    "trust_writes_enabled": false,
+    "configuration_write_enabled": false,
+    "authenticated_reconnect_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
