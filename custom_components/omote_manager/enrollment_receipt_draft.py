@@ -88,7 +88,7 @@ def make_test_receipt(body: dict, signer_private_key) -> dict:
 def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
                    expected_signer: str, expected_session_sha256: str,
                    expected_tx_id: str, expected_epoch: int,
-                   expected_ha_fingerprint: str,
+                   expected_device_id: str, expected_ha_fingerprint: str,
                    expected_device_fingerprint: str) -> dict:
     """Verify signed public metadata against independent, externally bound facts.
 
@@ -107,6 +107,7 @@ def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
     if (expected_signer not in SIGNERS
             or body["signer"] != expected_signer
             or body["tx_id"] != expected_tx_id
+            or body["device_id"] != expected_device_id
             or body["epoch"] != expected_epoch
             or body["session_transcript_sha256"] != expected_session_sha256
             or body["ha_key_sha256"] != expected_ha_fingerprint
@@ -128,13 +129,17 @@ def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
 
 def reconcile_offline(envelopes: list, *, ha_public_sec1: bytes,
                       device_public_sec1: bytes,
-                      session_sha256: str, tx_id: str, epoch: int) -> dict:
+                      session_sha256: str, tx_id: str, epoch: int,
+                      device_id: str) -> dict:
     """Require six signed phases across both sides before diagnostic agreement.
 
     All outcomes have `paired=false`, including complete agreement.
     Missing receipts remain pending and MAY NOT be trusted automatically.
     """
-    if type(envelopes) is not list or len(envelopes) > 12 or not _hex(session_sha256, 64):
+    if (type(envelopes) is not list or len(envelopes) > 12
+            or not _hex(session_sha256, 64) or not _hex(tx_id, 32)
+            or type(device_id) is not str or not re.fullmatch(r"[0-9a-f]{16,64}", device_id)
+            or len(device_id) % 2):
         raise ReceiptRejected("invalid-reconciliation-input")
     ha_fp = sha256(ha_public_sec1).hexdigest()
     device_fp = sha256(device_public_sec1).hexdigest()
@@ -150,7 +155,8 @@ def reconcile_offline(envelopes: list, *, ha_public_sec1: bytes,
         body = verify_receipt(
             envelope, verified_peer_public_sec1=key, expected_signer=role,
             expected_session_sha256=session_sha256, expected_tx_id=tx_id,
-            expected_epoch=epoch, expected_ha_fingerprint=ha_fp,
+            expected_epoch=epoch, expected_device_id=device_id,
+            expected_ha_fingerprint=ha_fp,
             expected_device_fingerprint=device_fp,
         )
         identity = (body["signer"], body["phase"])
