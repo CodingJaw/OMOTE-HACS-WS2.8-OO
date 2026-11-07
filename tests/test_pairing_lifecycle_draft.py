@@ -114,7 +114,7 @@ class PairingLifecycleTests(unittest.TestCase):
         self.assertNotIn(".async_save(", source)
         self.assertNotIn(".post(", source)
         self.assertNotIn(".put(", source)
-        self.assertNotIn("commit_trust\", to=", source)
+        self.assertIn('if event in ("commit_trust", "reconnect"):', source)
 
 
 if __name__ == "__main__":
