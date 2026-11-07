@@ -12,6 +12,7 @@ import re
 from hashlib import sha256
 
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
@@ -50,9 +51,9 @@ def validate_body(body: object) -> dict:
             raise ReceiptRejected("receipt-digest")
     if type(body["epoch"]) is not int or body["epoch"] < 1 or body["epoch"] > 0xFFFFFFFF:
         raise ReceiptRejected("receipt-epoch")
-    if body["signer"] not in SIGNERS or type(body["signer"]) is not str:
+    if type(body["signer"]) is not str or body["signer"] not in SIGNERS:
         raise ReceiptRejected("receipt-signer")
-    if body["phase"] not in PHASES or type(body["phase"]) is not str:
+    if type(body["phase"]) is not str or body["phase"] not in PHASES:
         raise ReceiptRejected("receipt-phase")
     return dict(body)
 
@@ -80,10 +81,7 @@ def make_test_receipt(body: dict, signer_private_key) -> dict:
     if not isinstance(signer_private_key, ec.EllipticCurvePrivateKey) or not isinstance(
             signer_private_key.curve, ec.SECP256R1):
         raise ReceiptRejected("wrong-test-key-type")
-    signature = signer_private_key.sign(signed_bytes(body), ec.ECDSA(
-        __import__("cryptography.hazmat.primitives.hashes",
-                   fromlist=["SHA256"]).SHA256()
-    ))
+    signature = signer_private_key.sign(signed_bytes(body), ec.ECDSA(hashes.SHA256()))
     return {"body": validate_body(body), "signature_der_hex": signature.hex()}
 
 
@@ -101,9 +99,10 @@ def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
     if type(envelope) is not dict or set(envelope) != {"body", "signature_der_hex"}:
         raise ReceiptRejected("receipt-envelope")
     body = validate_body(envelope["body"])
-    if not _hex(envelope["signature_der_hex"], len(envelope["signature_der_hex"])) or not (
-            16 <= len(envelope["signature_der_hex"]) <= 160
-            and len(envelope["signature_der_hex"]) % 2 == 0):
+    signature_hex = envelope["signature_der_hex"]
+    if (type(signature_hex) is not str
+            or len(signature_hex) < 16 or len(signature_hex) > 160
+            or len(signature_hex) % 2 or not _hex(signature_hex, len(signature_hex))):
         raise ReceiptRejected("receipt-signature-format")
     if (expected_signer not in SIGNERS
             or body["signer"] != expected_signer
@@ -121,10 +120,7 @@ def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
         raise ReceiptRejected("peer-public-key-mismatch")
     try:
         key.verify(bytes.fromhex(envelope["signature_der_hex"]),
-                   signed_bytes(body), ec.ECDSA(
-                       __import__("cryptography.hazmat.primitives.hashes",
-                                  fromlist=["SHA256"]).SHA256()
-                   ))
+                   signed_bytes(body), ec.ECDSA(hashes.SHA256()))
     except (InvalidSignature, ValueError):
         raise ReceiptRejected("invalid-peer-signature") from None
     return body
@@ -148,6 +144,8 @@ def reconcile_offline(envelopes: list, *, ha_public_sec1: bytes,
         if type(envelope) is not dict or type(envelope.get("body")) is not dict:
             raise ReceiptRejected("invalid-reconciliation-envelope")
         role = envelope["body"].get("signer")
+        if role not in ("ha", "device"):
+            raise ReceiptRejected("receipt-signer")
         key = ha_public_sec1 if role == "ha" else device_public_sec1
         body = verify_receipt(
             envelope, verified_peer_public_sec1=key, expected_signer=role,
