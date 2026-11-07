@@ -104,6 +104,13 @@ class OfflineFileJournalTests(unittest.TestCase):
                 record=record(1, "commit_intent"),
                 max_epoch=1, used_txids=frozenset()))
 
+    def test_record_cannot_be_silently_removed(self):
+        self.store.save(state())
+        with self.assertRaises(model.TrustJournalError):
+            self.store.save(model.Journal(
+                record=None, used_txids=frozenset({"1"*32}), max_epoch=1))
+        self.assertEqual(self.store.load().record["phase"], "prepared")
+
     def test_symlink_and_excessive_snapshot_rejected(self):
         actual = Path(self.temp.name) / "actual.json"
         actual.write_text("not a journal")
