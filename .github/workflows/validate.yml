@@ -77,11 +77,25 @@ jobs:
           upstream = json.loads(Path('/tmp/omote-contract/lab-mutual-review.json').read_text())
           assert local == upstream, 'Firmware and HACS LAB mutual review contracts differ'
           PY
+      - name: Compare firmware-owned production pairing lifecycle draft
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/151d6702c1ada1bdfe864271f182533a7ffa7b0f/Platformio/tools/config-v2-tests/pairing_lifecycle_contract_v1.json \
+            -o /tmp/omote-contract/pairing-lifecycle.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          upstream = json.loads(Path('/tmp/omote-contract/pairing-lifecycle.json').read_text())
+          local = json.loads(Path('tests/fixtures/pairing_lifecycle_contract_v1.json').read_text())
+          assert upstream == local, 'Firmware and HACS pairing lifecycle draft differ'
+          assert not any(local['authorization'].values()), 'Production pairing must remain disabled'
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
         env:
           OMOTE_FIRMWARE_CONTRACT: /tmp/omote-contract/preview.json
+          OMOTE_FIRMWARE_PAIRING_LIFECYCLE: /tmp/omote-contract/pairing-lifecycle.json
           OMOTE_FIRMWARE_PAIRING_CONTRACT: /tmp/omote-contract/pairing.json
           OMOTE_FIRMWARE_LAB_PROOF_CONTRACT: /tmp/omote-contract/lab-ha-proof.json
           OMOTE_FIRMWARE_LAB_DEVICE_CONTRACT: /tmp/omote-contract/lab-device-identity.json
