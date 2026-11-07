@@ -89,6 +89,9 @@ class OfflineFileJournalTests(unittest.TestCase):
             self.store.load()
 
     def test_epoch_and_phase_rollback_rejected(self):
+        with self.assertRaises(model.TrustJournalError):
+            self.store.save(state(1, "commit_intent"))
+        self.store.save(state(1, "prepared"))
         self.store.save(state(1, "commit_intent"))
         with self.assertRaises(model.TrustJournalError):
             self.store.save(state(1, "prepared"))
