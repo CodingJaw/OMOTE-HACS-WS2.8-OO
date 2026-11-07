@@ -106,6 +106,21 @@ jobs:
           assert all(enabled is False for key, enabled in local['authorization'].items() if key != 'laboratory_only')
           assert local['protocol']['credentials_or_trust_writes_enabled'] is False
           PY
+      - name: Compare firmware-owned signed enrollment receipt contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/eea0682cba634d859896b7db8766565621a4c752/Platformio/tools/config-v2-tests/enrollment_receipt_contract_v1.json \
+            -o /tmp/omote-contract/enrollment-receipt.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          firmware = json.loads(Path('/tmp/omote-contract/enrollment-receipt.json').read_text())
+          hacs = json.loads(Path('tests/fixtures/enrollment_receipt_contract_v1.json').read_text())
+          assert firmware == hacs, 'Signed receipt protocol fixtures differ'
+          assert hacs['authorization']['laboratory_only'] is True
+          assert all(value is False for key, value in hacs['authorization'].items() if key != 'laboratory_only')
+          assert hacs['scope'] == 'offline_signed_receipt_verification_only'
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
@@ -113,6 +128,7 @@ jobs:
           OMOTE_FIRMWARE_CONTRACT: /tmp/omote-contract/preview.json
           OMOTE_FIRMWARE_PAIRING_LIFECYCLE: /tmp/omote-contract/pairing-lifecycle.json
           OMOTE_FIRMWARE_TRUST_JOURNAL_CONTRACT: /tmp/omote-contract/trust-journal.json
+          OMOTE_FIRMWARE_ENROLLMENT_RECEIPT_CONTRACT: /tmp/omote-contract/enrollment-receipt.json
           OMOTE_FIRMWARE_PAIRING_CONTRACT: /tmp/omote-contract/pairing.json
           OMOTE_FIRMWARE_LAB_PROOF_CONTRACT: /tmp/omote-contract/lab-ha-proof.json
           OMOTE_FIRMWARE_LAB_DEVICE_CONTRACT: /tmp/omote-contract/lab-device-identity.json
