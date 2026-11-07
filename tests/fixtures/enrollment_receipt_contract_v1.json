@@ -2,7 +2,7 @@
   "contract": "omote-enrollment-receipt-v1-draft",
   "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
   "scope": "offline_signed_receipt_verification_only",
-  "domain": "OMOTE-ENROLLMENT-RECEIPT-V1\\n",
+  "domain": "OMOTE-ENROLLMENT-RECEIPT-V1\n",
   "body_fields": [
     "version",
     "tx_id",
