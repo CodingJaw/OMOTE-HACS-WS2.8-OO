@@ -73,12 +73,25 @@ async def ws_lab_readiness(hass: HomeAssistant, connection, msg: dict):
         valid_host = True
     except ValueError:
         valid_host = False
+    bundled_ready = False
+    diagnostic = "lab_not_enabled"
+    if _enabled():
+        try:
+            load_official_security2()  # Local dependency inspection only.
+            bundled_ready = True
+            diagnostic = "bundled_security2_ready"
+        except LabPrerequisiteError as exc:
+            diagnostic = str(exc)
+        except Exception:
+            diagnostic = "bundled_security2_unavailable"
     connection.send_result(msg["id"], {
         "lab_only": True,
         "enabled": _enabled(),
         "security2_client": "bundled-esp-idf-v5.4.2",
+        "bundled_client_ready": bundled_ready,
+        "client_diagnostic": diagnostic,
         "registered_lan_ipv4": valid_host,
-        "can_attempt": _enabled() and valid_host,
+        "can_attempt": _enabled() and valid_host and bundled_ready,
         "paired": False,
         "trusted": False,
         "deployment_enabled": False,
