@@ -2,7 +2,15 @@
 
 A HACS custom integration for [OMOTE object-oriented firmware](https://github.com/CodingJaw/OMOTE-Firmware-WS2.8-OO), including the Waveshare ESP32-S3 Touch LCD 2.8 V2 port.
 
-**Current development build: 0.1.0-dev22 (branch `main`).** OMOTE Manager supports an administrator-prepared persistent **candidate HA P-256 identity per remote**, read-only firmware pairing readiness, and Config v2 Security2 lab protocol contracts. **HACS does not establish encrypted Security2 sessions or trusted pairing, and firmware deployment/OTA remain disabled.** The experimental Waveshare Security2 listener is a separate, touchscreen-initiated laboratory feature.
+**Current development build: 0.1.0-dev24 (branch `main`).** OMOTE Manager supports an administrator-prepared persistent **candidate HA P-256 identity per remote**, read-only firmware pairing readiness, and an explicitly enabled **experimental Home Assistant-initiated Security2 laboratory connection** using a bundled Espressif SRP6a/AES-GCM client. The laboratory connection is disabled by default, requires a touchscreen-initiated firmware LAB session and its six-digit PIN, and has not yet passed a live HACS-to-Waveshare hardware handshake. **Trusted production pairing, firmware deployment, recovery writes, and OTA remain disabled.** No ESP-IDF checkout or `IDF_PATH` is required on Home Assistant.
+
+## Security2 LAB integration — dev24 acceptance status (2026-11-06)
+
+The user ran all 34 offline `test_sec2_lab*.py` tests successfully on the developer machine, and confirmed Home Assistant Core 2024.9.1 starts with OMOTE Manager, the existing Waveshare is online, Profile Studio remains functional, the per-remote HA candidate public fingerprint remains unchanged across update, **Check LAB prerequisites** is present, and **Run encrypted LAB test** remains disabled by default. This is an acceptance of the offline implementation and default-disabled Home Assistant UI, **not** a successful live HACS-originated pairing or encryption test.
+
+Home Assistant Core is managed by Linux `supervisord` in `/srv/homeassistant125`, **not** Home Assistant Supervisor or Docker. For an explicitly approved, isolated LAB run, the opt-in setting belongs inside `[program:hass]` in `/etc/supervisor/conf.d/hass.conf`: `environment=OMOTE_SEC2_LAB_ENABLE=\"1\"`. It is not a shell command. Keep the setting **unset** until a deliberate live test with the correct firmware image and fresh touchscreen PIN; return to disabled when finished. Do not put the PIN, any private keys, or credentials into logs or GitHub issues. No eFuse operations are needed.
+
+Full Security2 architecture and staged acceptance requirements: [Pairing Security2 interop plan](docs/PAIRING_SECURITY2_INTEROP_PLAN.md).
 
 **Branch policy (2026-11-03):** Develop and publish HACS updates from **`main`**; HACS does not depend on installing feature branches. Preserve older known-good versions in `stable/verified-dev17-before-v2`, `verified-dev17`, and `working`. Test each update before and after HACS installation. Firmware configuration deployments remain disabled. See [active-main development and rollback policy](docs/BRANCH_AND_RELEASE_POLICY.md).
 
