@@ -1,0 +1,78 @@
+{
+  "contract": "omote-trust-journal-v1-draft",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "scope": "offline_simulation_only",
+  "public_record": {
+    "exact_keys": [
+      "format",
+      "tx_id",
+      "device_id",
+      "ha_key_sha256",
+      "device_key_sha256",
+      "device_key_protection",
+      "phase",
+      "epoch"
+    ],
+    "format": "omote-trust-journal-v1-draft",
+    "tx_id": "32_lowercase_hex_random_transaction_identifier",
+    "device_id": "16_to_64_lowercase_hex_stable_hardware_identifier",
+    "ha_key_sha256": "64_lowercase_hex_sha256_of_canonical_P256_public_key",
+    "device_key_sha256": "64_lowercase_hex_sha256_of_canonical_P256_public_key",
+    "device_key_protection": "software_lab_untrusted",
+    "phases": [
+      "prepared",
+      "commit_intent",
+      "peer_confirmed",
+      "aborted",
+      "revoked"
+    ],
+    "epoch": "strict_positive_integer_monotonic_identity_generation",
+    "contains_private_key": false
+  },
+  "protocol": {
+    "network_endpoint_enabled": false,
+    "credentials_or_trust_writes_enabled": false,
+    "draft_procedure": [
+      "fresh_srp_and_mutual_key_proof",
+      "fresh_ha_admin_and_touch_approval_of_same_txid_and_fingerprints",
+      "prepare_locally_on_both_peers",
+      "commit_intent_locally_on_both_peers",
+      "exchange_authenticated_commit_receipts",
+      "reconcile_after_reboot_or_connection_loss",
+      "fresh_mutual_challenge_for_any_future_authenticated_operation"
+    ],
+    "identity_is_never_established_from_fingerprint_alone": true,
+    "commit_receipt_requires_authenticated_session_binding": true,
+    "loss_of_commit_receipt_requires_reconciliation_not_auto_authorization": true,
+    "no_claim_of_atomic_cross_device_commit": true,
+    "no_claim_of_write_or_deploy_authorization": true,
+    "reboot_requires_new_authorized_reconnect_proof": true,
+    "hardware_key_protection_required_before_production": true,
+    "reject_duplicate_transaction_ids": true,
+    "reject_non_monotonic_epochs": true,
+    "revoke_is_tombstone_not_delete": true
+  },
+  "authorization": {
+    "laboratory_only": true,
+    "production_trust_enabled": false,
+    "persistent_key_store_enabled": false,
+    "production_reconnect_enabled": false,
+    "device_config_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  },
+  "threat_tests": [
+    "mismatched_ha_key",
+    "mismatched_device_key",
+    "fake_peer_receipt",
+    "replayed_txid",
+    "epoch_rollback",
+    "torn_write",
+    "reboot_mid_commit",
+    "lost_receipt",
+    "asymmetric_commit",
+    "revocation_replay",
+    "software_lab_key_not_production"
+  ]
+}
