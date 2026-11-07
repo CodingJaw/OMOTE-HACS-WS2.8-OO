@@ -91,12 +91,28 @@ jobs:
           assert local['authorization']['laboratory_only'] is True, 'LAB mode must be marked laboratory-only'
           assert all(value is False for key, value in local['authorization'].items() if key != 'laboratory_only'), 'Production privileges must remain disabled'
           PY
+      - name: Compare firmware-owned draft trust journal contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/a54ba79a07bbb22fc99910c1dc95e6c450b7c574/Platformio/tools/config-v2-tests/trust_journal_contract_v1.json \
+            -o /tmp/omote-contract/trust-journal.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          upstream = json.loads(Path('/tmp/omote-contract/trust-journal.json').read_text())
+          local = json.loads(Path('tests/fixtures/trust_journal_contract_v1.json').read_text())
+          assert upstream == local, 'Firmware and HACS public trust journal contracts differ'
+          assert local['authorization']['laboratory_only'] is True
+          assert all(enabled is False for key, enabled in local['authorization'].items() if key != 'laboratory_only')
+          assert local['protocol']['credentials_or_trust_writes_enabled'] is False
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
         env:
           OMOTE_FIRMWARE_CONTRACT: /tmp/omote-contract/preview.json
           OMOTE_FIRMWARE_PAIRING_LIFECYCLE: /tmp/omote-contract/pairing-lifecycle.json
+          OMOTE_FIRMWARE_TRUST_JOURNAL_CONTRACT: /tmp/omote-contract/trust-journal.json
           OMOTE_FIRMWARE_PAIRING_CONTRACT: /tmp/omote-contract/pairing.json
           OMOTE_FIRMWARE_LAB_PROOF_CONTRACT: /tmp/omote-contract/lab-ha-proof.json
           OMOTE_FIRMWARE_LAB_DEVICE_CONTRACT: /tmp/omote-contract/lab-device-identity.json
