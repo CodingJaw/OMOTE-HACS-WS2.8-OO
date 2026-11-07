@@ -106,6 +106,17 @@ python -m unittest discover -s tests \
   -p 'test_sec2_verified_proofs_transcript.py' -v
 ```
 
+The HACS offline proof-to-receipt integration test also signs
+new ephemeral proof messages in memory, derives the transcript hash,
+signs an enrollment receipt with that hash, and confirms that a
+different transaction hash is rejected. The test NEVER sets
+`paired=true` or grants deployments:
+
+```bash
+python -m unittest discover -s tests \
+  -p 'test_sec2_transcript_receipt_binding.py' -v
+```
+
 Firmware CI runs Python and independent OpenSSL C++ proofs and expects the
 same canonical 402-byte synthetic test vector. HACS CI pins the exact
 firmware contract, vector and draft helper. Passing these tests only
