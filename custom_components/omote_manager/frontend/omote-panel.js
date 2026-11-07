@@ -621,12 +621,13 @@ class OmoteManagerPanel extends HTMLElement {
       this._labAvailable = info.can_attempt === true;
       run.disabled = !this._labAvailable || !remote.online;
       status.textContent = !info.enabled
-        ? "LAB disabled on the HA host. To opt in, configure OMOTE_SEC2_LAB_ENABLE=1 and restart HA. No pairing is enabled."
-        : !info.idf_path_configured
-          ? "LAB enabled, but the HA host has no ESP-IDF IDF_PATH. No network attempt is available."
+        ? "LAB disabled on the HA host. To opt in, set OMOTE_SEC2_LAB_ENABLE=1 in the HA Supervisor environment and restart HA. No pairing is enabled."
+        : !info.bundled_client_ready
+          ? "LAB enabled, but the bundled Security2 client prerequisites failed: " +
+            (info.client_diagnostic || "unavailable") + ". No remote attempt was made."
           : !info.registered_lan_ipv4
             ? "LAB requires a registered remote with a private LAN IPv4 address."
-            : "LAB host settings are configured. Press Start lab on the Waveshare, then run one encrypted test with the screen PIN. NOT PAIRED.";
+            : "Bundled Espressif Security2 client is ready. Physically Start lab on the Waveshare, then run one encrypted test with the screen PIN. NOT PAIRED.";
     } catch (_error) {
       if (request !== this._labRequest ||
           remote.entry_id !== this._selectedRemote) return;
