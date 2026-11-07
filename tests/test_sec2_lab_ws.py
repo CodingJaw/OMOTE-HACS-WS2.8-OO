@@ -145,6 +145,31 @@ class LabWebSocketTests(unittest.IsolatedAsyncioTestCase):
             await lab.ws_lab_test(hass, connection, self.request)
             self.assertEqual(len(connection.errors), 1)
 
+    async def test_bundled_client_readiness_without_idf_path(self):
+        with patch.dict(os.environ, {"OMOTE_SEC2_LAB_ENABLE": "1"}, clear=True):
+            hass, conn = HA(), Connection()
+            with patch.object(lab, "load_official_security2", return_value=object):
+                await lab.ws_lab_readiness(hass, conn, self.request)
+        self.assertFalse(conn.errors)
+        status = conn.results[0][1]
+        self.assertTrue(status["bundled_client_ready"])
+        self.assertTrue(status["can_attempt"])
+        self.assertEqual(status["security2_client"], "bundled-esp-idf-v5.4.2")
+        self.assertNotIn("idf_path_configured", status)
+        self.assertFalse(status["paired"])
+        self.assertFalse(status["deployment_enabled"])
+
+    async def test_bundled_client_preflight_failure_never_contacts_device(self):
+        with patch.dict(os.environ, {"OMOTE_SEC2_LAB_ENABLE": "1"}, clear=True):
+            hass, conn = HA(), Connection()
+            with patch.object(lab, "load_official_security2",
+                              side_effect=lab.LabPrerequisiteError("bad_bundle")):
+                await lab.ws_lab_readiness(hass, conn, self.request)
+        status = conn.results[0][1]
+        self.assertFalse(status["bundled_client_ready"])
+        self.assertFalse(status["can_attempt"])
+        self.assertEqual(status["client_diagnostic"], "bad_bundle")
+
     async def test_nonadmin_rejected_before_all_diagnostics(self):
         hass, conn = HA(), Connection(is_admin=False)
         with patch.dict(os.environ, {"OMOTE_SEC2_LAB_ENABLE": "1"}):
