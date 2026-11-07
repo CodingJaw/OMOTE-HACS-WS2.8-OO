@@ -87,7 +87,7 @@ class MutualSecurity2TransactionProofV2(unittest.TestCase):
     def test_mutation_of_signatures_or_signed_context_refused(self):
         for field in ("ha_signature_der_hex","device_signature_der_hex"):
             original=self.envelope[field]
-            bad=dict(self.envelope,**{field:original[:-2]+"00"})
+            bad=dict(self.envelope,**{field:original[:-2]+("00" if original[-2:]!="00" else "01")})
             with self.subTest(field=field),self.assertRaises(proof.MutualProofRejected):
                 proof.derive_bound(bad,observed=self.context)
         for field,new_value in (("epoch",3),("tx_id","d"*32),
