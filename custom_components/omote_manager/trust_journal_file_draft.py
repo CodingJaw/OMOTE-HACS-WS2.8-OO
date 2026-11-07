@@ -119,6 +119,9 @@ class OfflineJournalFile:
         # Fail closed: refuse to overwrite damaged state even with a good snapshot.
         previous = self.load()
         current = _snapshot(journal)
+        if previous.record is None and journal.record is not None:
+            if journal.record["phase"] != "prepared":
+                raise TrustJournalError("snapshot-must-begin-prepared")
         if journal.max_epoch < previous.max_epoch or not previous.used_txids.issubset(journal.used_txids):
             raise TrustJournalError("snapshot-rollback")
         if previous.record is not None and journal.record is not None:
