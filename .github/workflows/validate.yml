@@ -134,6 +134,31 @@ jobs:
           assert a==b, 'Signed receipt interoperability test vectors differ'
           assert len(b['vectors'])==2
           PY
+      - name: Compare pinned verified Security2 proof transcript draft
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/c99258e1e3aec0a108edae5d13ab2e6b5e09d110/Platformio/tools/config-v2-tests/sec2_verified_proofs_transcript_contract_v1.json \
+            -o /tmp/omote-contract/verified-proofs-contract.json
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/c99258e1e3aec0a108edae5d13ab2e6b5e09d110/Platformio/tools/config-v2-tests/sec2_verified_proofs_transcript_vectors_v1.json \
+            -o /tmp/omote-contract/verified-proofs-vectors.json
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/c99258e1e3aec0a108edae5d13ab2e6b5e09d110/Platformio/tools/config-v2-tests/sec2_verified_proofs_transcript.py \
+            -o /tmp/omote-contract/verified-proofs-implementation.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          pairs = [
+              ('verified-proofs-contract.json', 'tests/fixtures/sec2_verified_proofs_transcript_contract_v1.json'),
+              ('verified-proofs-vectors.json', 'tests/fixtures/sec2_verified_proofs_transcript_vectors_v1.json'),
+          ]
+          for upstream, local in pairs:
+              assert json.loads(Path('/tmp/omote-contract', upstream).read_text()) == json.loads(Path(local).read_text()), local
+          assert Path('/tmp/omote-contract/verified-proofs-implementation.py').read_bytes() == Path('custom_components/omote_manager/sec2_verified_proofs_transcript_draft.py').read_bytes(), 'Offline transcript implementation drift'
+          contract=json.loads(Path('tests/fixtures/sec2_verified_proofs_transcript_contract_v1.json').read_text())
+          assert contract['authorization']['laboratory_only'] is True
+          assert all(v is False for k,v in contract['authorization'].items() if k!='laboratory_only')
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
