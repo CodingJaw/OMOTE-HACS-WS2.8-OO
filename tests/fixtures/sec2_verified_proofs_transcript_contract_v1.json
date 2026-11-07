@@ -1,0 +1,60 @@
+{
+  "contract": "omote-sec2-verified-proofs-transcript-v1-draft",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "scope": "offline_deterministic_verified_proof_binding_only_no_live_runtime",
+  "transport": "ESP-IDF protocomm Security2 SRP6a AES-256-GCM",
+  "existing_ha_proof_domain": "OMOTE-SEC2-LAB-HA-PROOF-V1",
+  "existing_device_proof_domain": "OMOTE-SEC2-LAB-DEVICE-PROOF-V1",
+  "transcript_domain": "OMOTE-SEC2-VERIFIED-PROOFS-V1\n",
+  "inputs": [
+    "version",
+    "session_id",
+    "epoch",
+    "tx_id",
+    "device_id",
+    "ha_public_sec1_hex",
+    "device_public_sec1_hex",
+    "ha_nonce_hex",
+    "device_challenge_hex",
+    "ha_proof_signature_der_hex",
+    "device_proof_signature_der_hex"
+  ],
+  "canonical_binary_layout": [
+    "domain:ASCII_exact",
+    "version:u8_1",
+    "session_id:u32_be_nonzero",
+    "epoch:u32_be_nonzero",
+    "tx_id:16_bytes",
+    "device_id_length:u8_8_to_32",
+    "device_id:8_to_32_bytes",
+    "ha_public_sec1:65_bytes_uncompressed_P256",
+    "device_public_sec1:65_bytes_uncompressed_P256",
+    "ha_nonce:32_bytes",
+    "device_challenge:32_bytes",
+    "ha_signature_length:u8_8_to_80",
+    "ha_signature:DER_P256_ECDSA_SHA256_8_to_80",
+    "device_signature_length:u8_8_to_80",
+    "device_signature:DER_P256_ECDSA_SHA256_8_to_80"
+  ],
+  "ha_signed_message": "ASCII(OMOTE-SEC2-LAB-HA-PROOF-V1)||u32_be_session_id||ha_public_sec1_65||ha_nonce_32",
+  "device_signed_message": "ASCII(OMOTE-SEC2-LAB-DEVICE-PROOF-V1)||u32_be_session_id||device_challenge_32||device_public_sec1_65",
+  "digest": "sha256(canonical_binary_payload)",
+  "constraints": {
+    "signature_validation": "both independent P256 proof signatures must verify before deriving digest",
+    "session_validation": "session_id must originate from a verified Security2 session, not client JSON",
+    "freshness": "tx_id and both challenges must be fresh for every transaction",
+    "approval": "HA admin approval and physical touchscreen approval are separate mandatory gates, not proven by this digest",
+    "identity": "software P256 lab keys are NOT hardware root of trust",
+    "replay": "test phase does not implement anti-replay journal"
+  },
+  "authorization": {
+    "laboratory_only": true,
+    "production_pairing_enabled": false,
+    "persistent_trust_enabled": false,
+    "authenticated_reconnect_enabled": false,
+    "device_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
