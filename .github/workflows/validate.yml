@@ -88,7 +88,8 @@ jobs:
           upstream = json.loads(Path('/tmp/omote-contract/pairing-lifecycle.json').read_text())
           local = json.loads(Path('tests/fixtures/pairing_lifecycle_contract_v1.json').read_text())
           assert upstream == local, 'Firmware and HACS pairing lifecycle draft differ'
-          assert not any(local['authorization'].values()), 'Production pairing must remain disabled'
+          assert local['authorization']['laboratory_only'] is True, 'LAB mode must be marked laboratory-only'
+          assert all(value is False for key, value in local['authorization'].items() if key != 'laboratory_only'), 'Production privileges must remain disabled'
           PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
