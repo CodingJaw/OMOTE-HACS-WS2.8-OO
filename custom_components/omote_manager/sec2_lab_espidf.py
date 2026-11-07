@@ -1,93 +1,49 @@
-"""Opt-in Espressif Security2 Python reference-client loader.
+"""Fail-closed loader for the isolated, bundled Espressif Security2 v5.4.2.
 
-No package installation or network access takes place here. The HACS
-integration MUST NOT auto-download or dynamically install cryptography code.
-The operator must explicitly provide a compatible installed ESP-IDF checkout
-through IDF_PATH on the Home Assistant host, and enable LAB mode separately.
-
-WARNING: Espressif's Python provisioning reference uses unqualified module
-names "proto", "utils" and "security", so refuse collisions rather than
-replace Home Assistant's already loaded unrelated modules.
+The bundled client retains Espressif's SRP6a/AES-GCM implementation, and
+generated protocomm protobufs load from a private descriptor pool.
+No external IDF_PATH, sys.path changes, runtime downloads or package
+installation is attempted. This module never opens a network connection.
 """
 from __future__ import annotations
 
-import importlib
 import inspect
-import os
-from pathlib import Path
-import sys
+from importlib import metadata
 
 
 class LabPrerequisiteError(RuntimeError):
-    """Error code only. Never expose underlying filesystem or import details."""
+    """Short diagnostic code; never include host secrets or raw import errors."""
 
 
-_REQUIRED = (
-    "tools/esp_prov/security/security2.py",
-    "tools/esp_prov/security/srp6a.py",
-    "tools/esp_prov/utils/__init__.py",
-    "tools/esp_prov/proto/__init__.py",
-    "components/protocomm/python/session_pb2.py",
-    "components/protocomm/python/sec2_pb2.py",
-    "components/protocomm/python/constants_pb2.py",
-)
-
-
-def _inside(path: str, root: Path) -> bool:
+def _supported_dependencies() -> bool:
+    """Baseline matches Home Assistant Core 2024.9.1's installed libraries."""
     try:
-        return Path(path).resolve().is_relative_to(root)
-    except (ValueError, TypeError, OSError):
+        cryptography = metadata.version("cryptography").split(".")
+        protobuf = metadata.version("protobuf").split(".")
+        return (
+            42 <= int(cryptography[0]) <= 45
+            and int(protobuf[0]) == 4
+            and int(protobuf[1]) >= 25
+        )
+    except (metadata.PackageNotFoundError, ValueError, IndexError):
         return False
 
 
 def load_official_security2():
-    """Load the official matching ESP-IDF Python Security2 class, fail closed.
+    """Return bundled unmodified-algorithm Espressif Security2 class.
 
-    This routine is called ONLY after explicit LAB enablement and cannot
-    start any remote connection, prepare keys or grant pairing authority.
+    Only used by explicitly enabled LAB WebSocket after administrator
+    authorization. An incompatible HA Python environment fails closed.
     """
-    configured = os.environ.get("IDF_PATH")
-    if not configured or len(configured) > 1024:
-        raise LabPrerequisiteError("idf_path_not_configured")
+    if not _supported_dependencies():
+        raise LabPrerequisiteError("incompatible_crypto_or_protobuf_version")
     try:
-        root = Path(configured).expanduser().resolve(strict=True)
-        if (not root.is_dir()
-                or not all((root / p).is_file() for p in _REQUIRED)):
-            raise LabPrerequisiteError("espidf_source_not_found")
-    except (OSError, ValueError, RuntimeError) as exc:
-        if isinstance(exc, LabPrerequisiteError):
-            raise
-        raise LabPrerequisiteError("espidf_source_not_found") from None
-
-    tool_path = (root / "tools/esp_prov").resolve()
-    # ESP-IDF uses these globally importable packages. Never clobber a
-    # third-party package already imported by Home Assistant.
-    for name in ("proto", "utils", "security"):
-        module = sys.modules.get(name)
-        if module is not None and not _inside(
-            getattr(module, "__file__", None), tool_path
-        ):
-            raise LabPrerequisiteError("espidf_module_namespace_conflict")
-
-    inserted = str(tool_path) not in sys.path
-    try:
-        if inserted:
-            sys.path.insert(0, str(tool_path))
-        package = importlib.import_module("security.security2")
-        target = getattr(package, "Security2")
-        signature = inspect.signature(target)
-        needed = {"sec_patch_ver", "username", "password", "verbose"}
-        if not needed.issubset(signature.parameters):
-            raise LabPrerequisiteError("unsupported_espidf_security2_version")
-        if not _inside(getattr(package, "__file__", None), tool_path):
-            raise LabPrerequisiteError("espidf_module_namespace_conflict")
-        return target
+        from .sec2_vendor.security2 import Security2
+        params = inspect.signature(Security2).parameters
+        if not {"sec_patch_ver", "username", "password", "verbose"}.issubset(params):
+            raise LabPrerequisiteError("unsupported_bundled_security2_version")
+        return Security2
     except LabPrerequisiteError:
         raise
     except Exception:
-        raise LabPrerequisiteError("espidf_import_or_dependency_failure") from None
-    finally:
-        if inserted:
-            # Keep Home Assistant's import search path unchanged. The loaded
-            # namespaced Espressif modules remain cached for the LAB run.
-            sys.path.remove(str(tool_path))
+        raise LabPrerequisiteError("bundled_security2_import_failed") from None
