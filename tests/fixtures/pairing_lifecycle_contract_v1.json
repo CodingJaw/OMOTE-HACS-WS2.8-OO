@@ -1,0 +1,108 @@
+{
+  "contract": "omote-pairing-lifecycle-v1-draft",
+  "owner_repository": "CodingJaw/OMOTE-Firmware-WS2.8-OO",
+  "scope": "offline_policy_only_no_trust_persistence_or_network_registration",
+  "states": [
+    "unpaired",
+    "window_open",
+    "proofs_verified",
+    "review_pending",
+    "review_approved",
+    "paired",
+    "revoked"
+  ],
+  "events": [
+    "open_window",
+    "verify_both",
+    "present_review",
+    "approve",
+    "reject",
+    "commit_trust",
+    "expire",
+    "revoke",
+    "reboot",
+    "reconnect"
+  ],
+  "rules": {
+    "window_seconds": 120,
+    "review_seconds": 60,
+    "require_srp6a_aesgcm": true,
+    "require_fresh_six_digit_pin": true,
+    "require_both_session_bound_p256_proofs": true,
+    "require_device_identity_hardware_protection_before_trust": true,
+    "require_exact_fingerprint_and_touchscreen_approval": true,
+    "require_ha_admin_approval": true,
+    "require_mutual_durable_commit_before_paired": true,
+    "reject_replay": true,
+    "no_stale_session_reuse": true,
+    "reboot_clears_uncommitted_approval": true,
+    "reconnect_requires_fresh_mutual_challenge_without_pin": true,
+    "revoke_requires_fresh_physical_approval": true
+  },
+  "allowed_transitions": [
+    {
+      "from": "unpaired",
+      "event": "open_window",
+      "to": "window_open"
+    },
+    {
+      "from": "window_open",
+      "event": "verify_both",
+      "to": "proofs_verified"
+    },
+    {
+      "from": "proofs_verified",
+      "event": "present_review",
+      "to": "review_pending"
+    },
+    {
+      "from": "review_pending",
+      "event": "approve",
+      "to": "review_approved"
+    },
+    {
+      "from": "review_pending",
+      "event": "reject",
+      "to": "unpaired"
+    },
+    {
+      "from": "review_approved",
+      "event": "commit_trust",
+      "to": "paired"
+    },
+    {
+      "from": "paired",
+      "event": "revoke",
+      "to": "revoked"
+    },
+    {
+      "from": "revoked",
+      "event": "open_window",
+      "to": "window_open"
+    }
+  ],
+  "terminal_reset_events": [
+    "expire",
+    "reboot"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "production_pairing_enabled": false,
+    "durable_trust_write_enabled": false,
+    "authenticated_reconnect_enabled": false,
+    "config_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  },
+  "acceptance_gates": [
+    "hardware_protected_device_identity_approved",
+    "two_party_durable_trust_transaction_implemented",
+    "fresh_admin_and_touch_approval_verified",
+    "reconnect_challenge_replay_tests",
+    "lost_or_replaced_HA_repair_tests",
+    "revocation_and_reboot_tests",
+    "power_loss_and_rollback_tests",
+    "physical_Waveshare_test"
+  ]
+}
