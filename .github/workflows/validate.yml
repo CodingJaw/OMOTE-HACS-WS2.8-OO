@@ -177,6 +177,20 @@ jobs:
           assert local['authorization']['laboratory_only'] is True
           assert all(v is False for k,v in local['authorization'].items() if k!='laboratory_only')
           PY
+      - name: Compare pinned encrypted Security2 v2 LAB wire contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/f2380458a241b404eaaab1a709223649143d0c6a/Platformio/tools/config-v2-tests/sec2_tx_v2_live_lab_wire_contract.json \
+            -o /tmp/omote-contract/tx-v2-live-wire.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          upstream=json.loads(Path('/tmp/omote-contract/tx-v2-live-wire.json').read_text())
+          local=json.loads(Path('tests/fixtures/sec2_tx_v2_live_lab_wire_contract.json').read_text())
+          assert upstream==local, 'Live encrypted Security2 v2 LAB wire contract mismatch'
+          assert local['authorization']['laboratory_only'] is True
+          assert all(v is False for k,v in local['authorization'].items() if k!='laboratory_only')
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
