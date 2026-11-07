@@ -437,3 +437,76 @@ new suites require their own test execution. No eFuse or firmware
 update is needed simply to install this HACS work. Permanent trust,
 protected device private key, PIN-free reconnect and deployment are
 still blocked by firmware issue #1 / HACS issue #6.
+
+
+## 2026-11-06 — dev23 bundled Security2 (supersedes earlier IDF_PATH guidance)
+
+The laboratory client is now packaged directly with the HACS integration.
+The earlier dev23 instructions requiring a full ESP-IDF source checkout,
+`IDF_PATH` on Home Assistant, or an IDF installation in the
+`/srv/homeassistant125` virtual environment are **obsolete**.
+
+The integration vendors only Espressif's Apache-2.0 Python Security2
+SRP6a/AES-GCM and compact protocomm protobuf modules from **ESP-IDF
+v5.4.2** in `custom_components/omote_manager/sec2_vendor/`.
+`LICENSE` and `NOTICE.md` preserve license terms, exact upstream
+file provenance, and a list of adapted imports. The provisioning
+transport is not vendored: HACS uses its existing bounded async
+`sec2_lab_http.py` on port 18082 instead.
+
+All vendored modules use private relative imports. The generated
+protobuf modules use a private DescriptorPool rather than injecting
+generic `session.proto` etc. into Home Assistant's process-global
+protobuf pool. They reuse the installed `cryptography` and
+`protobuf` packages. The loader refuses incompatible versions or
+missing dependencies, with no Security0/1 downgrade, no runtime
+downloads and no `sys.path` changes. The HA 2024.9.1 reported
+environment (Python 3.12.5, cryptography 43.0.0, protobuf 4.25.4)
+matches the intended laboratory dependency range; actual runtime
+imports and hardware interoperability still require testing.
+
+### Opt-in for the user's supervisord-managed HA Core
+
+The user's Core 2024.9.1 process runs from
+`/srv/homeassistant125/bin/hass` via
+`/etc/supervisor/conf.d/hass.conf`, as user `homeassistant`.
+**Do not use shell syntax** for Supervisor's `environment` option.
+Only AFTER offline tests, HACS restart/regression checks and an
+explicit decision to perform one physical lab attempt, add this
+single setting **inside the existing [program:hass] section**:
+
+```ini
+environment=OMOTE_SEC2_LAB_ENABLE="1"
+```
+
+No `IDF_PATH` variable and no ESP-IDF installation is required.
+Apply Supervisor configuration changes using its managed controls
+during a planned HA restart, then confirm the HACS Overview LAB
+readiness reports the bundled Security2 client available. The
+read-only HACS functionality stays accessible even when LAB is OFF.
+
+The laboratory run still needs an intentionally flashed experimental
+Waveshare lab image, a locally tapped Start lab, a fresh on-screen
+six-digit PIN, and knowledge of the persistent NVS attempt quota.
+After testing, remove the environment setting and restart HA to
+disable the experimental test. Do not migrate this capability into
+production pairing or deployment without separate protocol/key
+protection and hardware approval.
+
+### Required offline tests
+
+The existing 8/8 dev22 adapter suite was physically user-executed on
+the developer's Python 3.12 venv. The new bundled-source and
+Home-Assistant-integrated path have **not yet passed user or CI
+acceptance**. Run:
+
+```bash
+python -m pip install cryptography==43.0.1 aiohttp==3.10.5 protobuf==4.25.4 voluptuous==0.15.2
+python -m unittest discover -s tests -p 'test_sec2_lab*.py' -v
+```
+
+Tests cover the newly vendored protobuf wire structures, SRP command
+generation, descriptor isolation, dependency-fail-closed behavior,
+async transport strictness and WebSocket admin/default-off gates. Do
+not open the Waveshare's lab window until these tests pass and a
+matching lab firmware/USB restore checkpoint is confirmed.
