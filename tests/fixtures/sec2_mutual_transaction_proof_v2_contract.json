@@ -1,0 +1,77 @@
+{
+  "contract": "omote-sec2-mutual-transaction-proof-v2-draft",
+  "scope": "offline_test_only_not_registered_to_live_security2",
+  "version": 2,
+  "session_transport": "protocomm-security2-srp6a-aes256gcm",
+  "purpose": "Both HA and device sign the identical fully specified enrollment transaction context before any receipt is eligible",
+  "context_fields": [
+    "version",
+    "session_id",
+    "epoch",
+    "tx_id",
+    "device_id",
+    "ha_public_sec1_hex",
+    "device_public_sec1_hex",
+    "ha_nonce_hex",
+    "device_challenge_hex"
+  ],
+  "canonical_context_layout": [
+    "u8_version_2",
+    "u32_be_nonzero_verified_security2_cookie",
+    "u32_be_nonzero_identity_epoch",
+    "16_byte_tx_id",
+    "u8_device_id_len_8_to_32",
+    "device_id_bytes",
+    "65_byte_ha_P256_SEC1_point",
+    "65_byte_device_P256_SEC1_point",
+    "32_byte_HA_nonce",
+    "32_byte_device_challenge"
+  ],
+  "signatures": {
+    "algorithm": "ECDSA_P256_SHA256_DER",
+    "ha": "ASCII('OMOTE-SEC2-TX-PROOF-HA-V2\\n')||canonical_context",
+    "device": "ASCII('OMOTE-SEC2-TX-PROOF-DEVICE-V2\\n')||canonical_context",
+    "signature_length": "8_to_80_bytes_strict_canonical_DER"
+  },
+  "digest": {
+    "formula": "SHA256(ASCII('OMOTE-SEC2-TX-TRANSCRIPT-V2\\n')||canonical_context||u8_HA_sig_len||HA_sig_DER||u8_device_sig_len||device_sig_DER)",
+    "field": "session_transcript_sha256"
+  },
+  "proof_envelope_fields": [
+    "context",
+    "ha_signature_der_hex",
+    "device_signature_der_hex"
+  ],
+  "required_independent_observations": [
+    "session_cookie_from_verified_encrypted_security2_local_channel",
+    "matching_fresh_transaction_id_from_both_authenticated_peers",
+    "physical_device_id_and_identity_epoch",
+    "both_peer_public_identity_keys_verified_outside_received_proofs",
+    "both_fresh_random_challenges_observed_by_authenticated_channel"
+  ],
+  "protocol_order": [
+    "establish_Security2_channel_and_verify_one_time_code",
+    "exchange_both_public_keys_and_nonce_challenge_inside_authenticated_session",
+    "agree_fresh_tx_id_device_id_and_epoch_before_signatures",
+    "sign_identical_role_domain_separated_canonical_context_on_each_peer",
+    "verify_both_signatures_against_independently_observed_context",
+    "calculate_digest_for_offline_receipt_candidate_only",
+    "require_separately_authenticated_HA_admin_and_physical_touch_confirmation",
+    "never_promote_trust_in_this_draft"
+  ],
+  "security_notes": [
+    "Existing v1 signed proof messages omit tx_id_device_id_and_epoch; use v2 rather than treating v1 hash as transaction authorization",
+    "A verified signed context cannot prove that session_id_or_approvals were observed live; no production pairing path uses this module",
+    "Both parties must derive context independently from authenticated message state; not from untrusted HTTP JSON"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "production_pairing_enabled": false,
+    "persistent_trust_enabled": false,
+    "authenticated_reconnect_enabled": false,
+    "device_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_programming_enabled": false
+  }
+}
