@@ -124,6 +124,8 @@ class OfflineJournalFile:
                 raise TrustJournalError("snapshot-must-begin-prepared")
         if journal.max_epoch < previous.max_epoch or not previous.used_txids.issubset(journal.used_txids):
             raise TrustJournalError("snapshot-rollback")
+        if previous.record is not None and journal.record is None:
+            raise TrustJournalError("snapshot-record-removal")
         if previous.record is not None and journal.record is not None:
             if journal.max_epoch == previous.max_epoch:
                 allowed = {"prepared": {"prepared", "commit_intent", "aborted", "revoked"},
