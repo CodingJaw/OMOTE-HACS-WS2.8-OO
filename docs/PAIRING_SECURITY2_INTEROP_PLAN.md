@@ -1,3 +1,5 @@
+> **Current dev24 implementation (2026-11-06):** Security2 is bundled inside HACS. No ESP-IDF installation or `IDF_PATH` on Home Assistant is required. Older dev20–dev23 notes below retain historical experiments and are superseded by the **dev23 bundled Security2** section at the end of this document. Production pairing and deployment remain disabled.
+
 # OMOTE HACS secure pairing — Python interoperability plan
 
 Status (2026-11-06): **production pairing not implemented**. HACS dev22 has read-only pairing status, firmware-owned Security2 lab protocol contracts, and a persistent administrator-prepared P-256 *candidate* HA identity. The isolated Waveshare laboratory image has demonstrated SRP6a/AES-GCM and two P-256 possession proofs on hardware, but HACS itself does **not** establish Security2 sessions or enroll trust. Firmware deployment and OTA remain disabled. This document is a compatibility checklist, not authorization to expose remote write routes.
