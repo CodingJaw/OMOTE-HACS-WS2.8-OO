@@ -159,6 +159,24 @@ jobs:
           assert contract['authorization']['laboratory_only'] is True
           assert all(v is False for k,v in contract['authorization'].items() if k!='laboratory_only')
           PY
+      - name: Compare pinned firmware mutual transaction proof v2
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/38faa9ba37586d715a5aa2f37c4a5cdf285d2859/Platformio/tools/config-v2-tests/sec2_mutual_transaction_proof_v2_contract.json \
+            -o /tmp/omote-contract/mutual-v2-contract.json
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/38faa9ba37586d715a5aa2f37c4a5cdf285d2859/Platformio/tools/config-v2-tests/sec2_mutual_transaction_proof_v2.py \
+            -o /tmp/omote-contract/mutual-v2-helper.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          upstream=json.loads(Path('/tmp/omote-contract/mutual-v2-contract.json').read_text())
+          local=json.loads(Path('tests/fixtures/sec2_mutual_transaction_proof_v2_contract.json').read_text())
+          assert upstream==local, 'Security2 v2 mutual transaction contracts differ'
+          assert Path('/tmp/omote-contract/mutual-v2-helper.py').read_bytes()==Path('custom_components/omote_manager/sec2_mutual_transaction_proof_v2_draft.py').read_bytes(), 'Security2 mutual proof v2 helper drift'
+          assert local['authorization']['laboratory_only'] is True
+          assert all(v is False for k,v in local['authorization'].items() if k!='laboratory_only')
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
