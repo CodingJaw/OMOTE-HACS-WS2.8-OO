@@ -1,4 +1,4 @@
-> **Current dev24 implementation (2026-11-06):** Security2 is bundled inside HACS. No ESP-IDF installation or `IDF_PATH` on Home Assistant is required. Older dev20–dev23 notes below retain historical experiments and are superseded by the **dev23 bundled Security2** section at the end of this document. Production pairing and deployment remain disabled.
+> **Current dev24 implementation (2026-11-06):** Security2 is bundled inside HACS. No ESP-IDF installation or `IDF_PATH` on Home Assistant is required. Older dev20–dev23 notes below retain historical experiments and are superseded by the **dev24 bundled Security2** section at the end of this document. Production pairing and deployment remain disabled.
 
 # OMOTE HACS secure pairing — Python interoperability plan
 
@@ -441,7 +441,7 @@ protected device private key, PIN-free reconnect and deployment are
 still blocked by firmware issue #1 / HACS issue #6.
 
 
-## 2026-11-06 — dev23 bundled Security2 (supersedes earlier IDF_PATH guidance)
+## 2026-11-06 — dev24 bundled Security2 (supersedes earlier IDF_PATH guidance)
 
 The laboratory client is now packaged directly with the HACS integration.
 The earlier dev23 instructions requiring a full ESP-IDF source checkout,
