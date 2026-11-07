@@ -104,7 +104,7 @@ def verify_receipt(envelope: object, *, verified_peer_public_sec1: bytes,
             or len(signature_hex) < 16 or len(signature_hex) > 160
             or len(signature_hex) % 2 or not _hex(signature_hex, len(signature_hex))):
         raise ReceiptRejected("receipt-signature-format")
-    if (expected_signer not in SIGNERS
+    if (type(expected_signer) is not str or expected_signer not in SIGNERS
             or body["signer"] != expected_signer
             or body["tx_id"] != expected_tx_id
             or body["device_id"] != expected_device_id
@@ -141,6 +141,8 @@ def reconcile_offline(envelopes: list, *, ha_public_sec1: bytes,
             or type(device_id) is not str or not re.fullmatch(r"[0-9a-f]{16,64}", device_id)
             or len(device_id) % 2):
         raise ReceiptRejected("invalid-reconciliation-input")
+    _public_key(ha_public_sec1)
+    _public_key(device_public_sec1)
     ha_fp = sha256(ha_public_sec1).hexdigest()
     device_fp = sha256(device_public_sec1).hexdigest()
     seen = set()
