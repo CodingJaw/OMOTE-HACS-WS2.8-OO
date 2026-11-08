@@ -1,0 +1,31 @@
+{
+  "contract": "omote-sec2-tx-v2-local-review-lab-v1",
+  "scope": "read_only_encrypted_touch_review_observation_no_pairing",
+  "transport": {
+    "port": 18082,
+    "endpoint": "omote-tx2-review",
+    "security": "protocomm-security2-srp6a-aes256gcm",
+    "same_authenticated_session_required": true
+  },
+  "request": "u8_version_2|transcript_sha256_32",
+  "response": "u8_version_2|u8_state_0_pending_1_reviewed|transcript_sha256_32",
+  "constraints": [
+    "device_status_requires_existing_mutual_p256_verified_transaction",
+    "request_digest_must_match_fully_verified_volatily_stored_transcript",
+    "session_must_equal_completed_proof_security2_callback_session",
+    "review_snapshot_session_must_equal_same_security2_callback_session",
+    "review_state_is_only_mutated_by_physical_touch_or_expiration",
+    "reject_or_timeout_or_close_returns_no_reviewed_status",
+    "client_polls_only_when_tx_v2_await_touch_is_explicitly_selected",
+    "no_ha_admin_authorization_or_persistent_trust_is_proven"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "pairing_enabled": false,
+    "device_trust_write_enabled": false,
+    "ha_trust_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
