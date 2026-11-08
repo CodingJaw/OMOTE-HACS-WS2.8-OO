@@ -88,6 +88,40 @@ The next test must show an actual physical Review OK on the Waveshare and
 a corresponding successful status read by the same encrypted lab client.
 It must never be mistaken for an HA admin approval or production enrollment.
 
+## Optional signed touchscreen receipt — offline HACS compatibility only
+
+After real Waveshare hardware confirmed the physical Review OK status over
+Security2, firmware work added a separate one-time LAB-only signed receipt
+endpoint `omote-tx2-touch-receipt`. This is device-key proof of that
+specific review state, session ID, verified v2 transcript SHA-256, and
+a fresh HA client challenge. The hardware signature has NOT yet been
+tested. The test key remains ordinary software-backed NVS identity.
+
+The firmware-owned wire contract is mirrored byte-for-byte as
+`tests/fixtures/sec2_tx_v2_signed_touch_receipt_lab_contract.json`.
+HACS CI compares it to a pinned firmware commit. No Home Assistant
+integration component registers, calls or accepts this endpoint as
+production enrollment, and no credentials or persistent trust are written.
+
+From the HACS repository root:
+
+```bash
+python3 -m unittest discover -s tests \
+  -p 'test_sec2_tx_v2_signed_touch_receipt_lab_contract.py' -v
+```
+
+The firmware's independent manual client supports
+`--tx-v2-lab --tx-v2-await-touch --tx-v2-attest-touch --ack-lab-only`,
+which verifies the physical acknowledgment's P-256 signature. This
+remains a deliberately non-authorizing lab exercise. Persistent HA admin
+approval, production-protected device identity, anti-replay trust journal,
+secure reconnect, revocation and deployments are separate follow-up tasks.
+
+**Security warning:** ESP-IDF 5.3.2's existing Python Security2
+implementation reuses an AES-GCM nonce across messages. Any production
+enrollment design must replace/upgrade this with a verified unique
+nonce or monotonic counter on both peers before secrets/trust are enabled.
+
 ## Still blocking production
 
 A live signed proof is still NOT pairing. Device key protection,
