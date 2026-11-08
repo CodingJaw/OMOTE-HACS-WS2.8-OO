@@ -191,6 +191,20 @@ jobs:
           assert local['authorization']['laboratory_only'] is True
           assert all(v is False for k,v in local['authorization'].items() if k!='laboratory_only')
           PY
+      - name: Verify pinned encrypted v2 local-touch review LAB contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/d23803afd71a02f95933f6fcf32746c62a34c69e/Platformio/tools/config-v2-tests/sec2_tx_v2_local_review_lab_wire_contract.json \
+            -o /tmp/omote-contract/v2-local-review.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          firmware=json.loads(Path('/tmp/omote-contract/v2-local-review.json').read_text())
+          hacs=json.loads(Path('tests/fixtures/sec2_tx_v2_local_review_lab_wire_contract.json').read_text())
+          assert firmware==hacs, 'v2 encrypted local-touch review lab contract mismatch'
+          assert hacs['authorization']['laboratory_only'] is True
+          assert all(v is False for k,v in hacs['authorization'].items() if k!='laboratory_only')
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
