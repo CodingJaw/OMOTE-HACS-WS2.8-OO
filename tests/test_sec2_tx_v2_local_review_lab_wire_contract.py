@@ -1,0 +1,53 @@
+"""Read-only, authenticated v2 touchscreen-review LAB protocol parity checks.
+
+HACS does not open any Security2 lab session, register this endpoint or
+interpret a local-only Review OK as permanent pairing authorization.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+WIRE = json.loads((ROOT / "tests/fixtures/sec2_tx_v2_local_review_lab_wire_contract.json").read_text())
+
+
+class LocalReviewLabContractTests(unittest.TestCase):
+    def test_exact_encrypted_read_only_review_framing(self):
+        self.assertEqual(WIRE["transport"]["endpoint"], "omote-tx2-review")
+        self.assertEqual(WIRE["transport"]["port"], 18082)
+        self.assertEqual(WIRE["transport"]["security"],
+                         "protocomm-security2-srp6a-aes256gcm")
+        self.assertTrue(WIRE["transport"]["same_authenticated_session_required"])
+        self.assertEqual(WIRE["request"], "u8_version_2|transcript_sha256_32")
+        self.assertEqual(
+            WIRE["response"],
+            "u8_version_2|u8_state_0_pending_1_reviewed|transcript_sha256_32",
+        )
+
+    def test_no_trust_or_write_authorization(self):
+        self.assertTrue(WIRE["authorization"]["laboratory_only"])
+        self.assertTrue(all(
+            value is False for key, value in WIRE["authorization"].items()
+            if key != "laboratory_only"
+        ))
+        constraints = WIRE["constraints"]
+        for required in (
+            "session_must_equal_completed_proof_security2_callback_session",
+            "review_snapshot_session_must_equal_same_security2_callback_session",
+            "review_state_is_only_mutated_by_physical_touch_or_expiration",
+            "reject_or_timeout_or_close_returns_no_reviewed_status",
+        ):
+            self.assertIn(required, constraints)
+
+    def test_lab_only_not_registered_as_hacs_deploy_path(self):
+        # A mirrored contract fixture is metadata, not a live endpoint.
+        integration = ROOT / "custom_components/omote_manager"
+        for path in integration.glob("*.py"):
+            content = path.read_text()
+            self.assertNotIn('omote-tx2-review', content, path.name)
+
+
+if __name__ == "__main__":
+    unittest.main()
