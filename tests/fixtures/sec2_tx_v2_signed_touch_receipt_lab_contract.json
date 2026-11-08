@@ -1,0 +1,56 @@
+{
+  "contract": "omote-sec2-v2-signed-touch-receipt-lab-v1",
+  "scope": "lab_only_one_shot_device_signed_local_touch_acknowledgement",
+  "transport": {
+    "port": 18082,
+    "endpoint": "omote-tx2-touch-receipt",
+    "requires": "authenticated_encrypted_protocomm_security2_session",
+    "touch_opened_window_ms": 120000
+  },
+  "request": {
+    "wire": "u8_version_2|verified_transaction_transcript_sha256_32|fresh_client_challenge_32",
+    "bytes": 65
+  },
+  "response": {
+    "wire": "u8_version_2|u8_state_1_local_reviewed|u8_der_signature_len_8_to_80|p256_der_signature",
+    "minimum_bytes": 11,
+    "maximum_bytes": 83
+  },
+  "signature": {
+    "key": "same_lab_device_p256_software_key_authenticated_by_v2_mutual_transaction",
+    "domain": "OMOTE-SEC2-TX2-TOUCH-RECEIPT-LAB-V1\n",
+    "message": "domain_ascii|u8_version_2|u32_be_authenticated_security2_session|verified_transaction_transcript_sha256_32|fresh_client_challenge_32|u8_state_1",
+    "algorithm": "ECDSA_P256_SHA256_DER"
+  },
+  "server_constraints": [
+    "no_signature_before_physical_Review_OK",
+    "local_review_snapshot_session_equals_authenticated_security2_callback_session",
+    "completed_v2_crypto_session_equals_callback_session",
+    "completed_transcript_sha256_equals_requested_digest",
+    "challenge_nonzero_32_bytes",
+    "one_signature_per_completed_session_only",
+    "no_network_callback_can_trigger_local_review",
+    "signature_uses_existing_lab_software_identity_only",
+    "no_nvs_trust_or_config_writes"
+  ],
+  "client_constraints": [
+    "must_first_verify_mutual_v2_p256_signatures_and_transcript",
+    "must_observe_reviewed_state_in_same_encrypted_session",
+    "fresh_cryptographic_random_challenge_each_attempt",
+    "verify_device_signature_using_v2_context_device_public_key",
+    "verify_exact_session_transcript_challenge_and_review_status",
+    "reject_malformed_der_wrong_device_wrong_digest_wrong_session_or_replay",
+    "verified_receipt_not_a_production_enrollment_grant"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "paired": false,
+    "trusted": false,
+    "ha_admin_verified": false,
+    "persistent_identity_trust": false,
+    "authenticated_reconnect_enabled": false,
+    "configuration_deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
