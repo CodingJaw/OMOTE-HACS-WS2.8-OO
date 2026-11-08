@@ -11,7 +11,7 @@
   "response": "u8_version_2|u8_state_0_pending_1_reviewed|transcript_sha256_32",
   "constraints": [
     "device_status_requires_existing_mutual_p256_verified_transaction",
-    "request_digest_must_match_fully_verified_volatily_stored_transcript",
+    "request_digest_must_match_fully_verified_volatile_stored_transcript",
     "session_must_equal_completed_proof_security2_callback_session",
     "review_snapshot_session_must_equal_same_security2_callback_session",
     "review_state_is_only_mutated_by_physical_touch_or_expiration",
