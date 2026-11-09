@@ -1,0 +1,39 @@
+{
+  "contract": "omote-sec2-transport-nonce-requirements-v1",
+  "scope": "offline_security_gate_for_future_pairing_only",
+  "evidence": {
+    "legacy_python": "https://github.com/espressif/esp-idf/blob/v5.3.2/tools/esp_prov/security/security2.py",
+    "legacy_firmware": "https://github.com/espressif/esp-idf/blob/v5.3.2/components/protocomm/src/security/security2.c",
+    "counter_python": "https://github.com/espressif/esp-idf/blob/v5.4.2/tools/esp_prov/security/security2.py",
+    "counter_firmware": "https://github.com/espressif/esp-idf/blob/v5.4.2/components/protocomm/src/security/security2.c"
+  },
+  "nonce_policy": {
+    "legacy_patch": 0,
+    "minimum_counter_patch": 1,
+    "production_pairing_must_reject_legacy_patch": true,
+    "require_client_counter_after_every_encryption_and_decryption": true,
+    "require_firmware_counter_after_every_encryption_and_decryption": true,
+    "require_cryptographically_authenticated_negotiated_patch": true,
+    "require_safe_concurrent_counter_handling_and_overflow_rejection": true,
+    "require_bidirectional_unique_nonce_across_session": true,
+    "require_mutual_p256_device_and_HA_key_proof": true,
+    "require_physical_touch_and_HA_admin_approval": true,
+    "counter_capability_alone_is_not_production_authorization": true,
+    "no_silent_downgrade": true
+  },
+  "existing_lab": {
+    "esp_idf_5_3_2_patch0_allowed_for_isolated_nonsecret_hardware_diagnostics": true,
+    "existing_security2_lab_must_remain_backward_compatible": true,
+    "plaintext_secrets_transmitted": false,
+    "device_configuration_write_enabled": false,
+    "live_ha_enrollment_enabled": false
+  },
+  "authorization": {
+    "laboratory_only": true,
+    "production_paired": false,
+    "persistent_ha_or_device_trust_enabled": false,
+    "remote_config_write_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
