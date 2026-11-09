@@ -1,5 +1,43 @@
 # HACS Security2 v2 transaction live LAB compatibility — development only
 
+## Latest Waveshare acceptance, and production nonce blocker (2026-11-08)
+
+The user's Waveshare hardware verified the full live Security2 laboratory
+transaction and **device-signed physical Review OK**. The last signed touch
+receipt PASS reported transcript
+`07bae75c41e01f7a7dd8ef4ec82cc7a6d12453c7df410c9a61a83392344bb6af`.
+This is evidence of a functioning **laboratory** workflow, NOT persistent
+HA/device trust, deployment access, or an authenticated production pairing.
+
+Espressif ESP-IDF 5.3.2's Security2 Python and firmware code reuse the
+same AES-GCM nonce for repeated session messages; ESP-IDF 5.4.2 has
+a counter-based nonce patch (patch 1). Future production pairing MUST reject
+patch 0, require a nonce-safe implementation on both ends, use
+cryptographically bound negotiation and verify nonce uniqueness across
+both traffic directions, including reconnection and counter overflow.
+
+The firmware now has an offline source auditor
+`Platformio/tools/config-v2-tests/sec2_nonce_policy.py` and an optional
+strict `--require-sec2-patch1` client check (both are diagnostics,
+not production pairing). The firmware-owned contract
+`sec2_transport_nonce_requirements_v1.json` is mirrored as
+`tests/fixtures/sec2_transport_nonce_requirements_v1.json`, and HACS
+CI compares it to a pinned firmware commit. It does NOT register an
+enrollment endpoint or switch on remote writes. To test its constraints:
+
+```bash
+cd ~/Documents/026code/OMOTE-HACS-WS2.8-OO
+python3 -m unittest discover -s tests \
+  -p 'test_sec2_transport_nonce_requirements.py' -v
+```
+
+No HACS restart, remote connection, PIN, NVS erase, or flashing is needed.
+The nonsecret legacy laboratory test can still run; production pairing,
+trust, authenticated reconnect, configuration deployment and OTA remain
+disabled until the secure-transport issue and other acceptance gates pass.
+
+
+
 Updated: 2026-11-08. HACS development branch: `main`.
 This change adds tests and a pinned protocol fixture only.
 **No HACS production enrollment, HA service, automatic connection,
