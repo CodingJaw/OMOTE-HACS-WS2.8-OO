@@ -234,6 +234,21 @@ jobs:
           assert hacs['authorization']['laboratory_only'] is True
           assert all(not val for key,val in hacs['authorization'].items() if key!='laboratory_only')
           PY
+      - name: Verify pinned Security2 nonce1 isolated toolchain candidate
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/ede0688306c2886c4fba7f0fec40bab3c2599706/Platformio/tools/config-v2-tests/sec2_nonce1_toolchain_candidate_contract.json \
+            -o /tmp/omote-contract/security2-nonce1-candidate.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          fw=json.loads(Path('/tmp/omote-contract/security2-nonce1-candidate.json').read_text())
+          ha=json.loads(Path('tests/fixtures/sec2_nonce1_toolchain_candidate_contract.json').read_text())
+          assert fw==ha, 'Security2 nonce1 toolchain candidate contract drift'
+          assert ha['authorization']['laboratory_only'] is True
+          assert all(v is False for k,v in ha['authorization'].items() if k!='laboratory_only')
+          assert ha['candidate']['board_build_and_runtime_not_yet_verified'] is True
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
