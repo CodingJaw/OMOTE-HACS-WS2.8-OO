@@ -1,0 +1,58 @@
+{
+  "contract": "omote-security2-nonce1-negative-acceptance-v1",
+  "scope": "LAB_ONLY_negative_protocol_and_lifecycle_acceptance",
+  "transport": {
+    "platformio_environment": "waveshare28v2_omote_sec2_tx_v2_nonce1_lab",
+    "required_security2_patch": 1,
+    "security2_listener_port": 18082,
+    "transaction_timeout_ms": 30000,
+    "touch_review_timeout_ms": 60000,
+    "lab_window_timeout_ms": 120000,
+    "expected_persistent_maximum_security_messages": 5,
+    "remote_version_advertisement_is_unauthenticated": true
+  },
+  "host_requirements": [
+    "reject_fixed_nonce_patch0_before_pin_or_srp_in_strict_mode",
+    "reject_wrong_signature_and_mismatched_verified_session",
+    "reject_stale_ciphertext_replay_with_counter",
+    "reject_invalid_aes_gcm_tag_and_fail_session_closed",
+    "never_resume_missing_response_on_old_nonce_counter",
+    "require_new_srp_key_and_nonce_prefix_on_reconnect",
+    "reject_counter_overflow",
+    "scrub_unacknowledged_fingerprints_at_exact_touch_deadline",
+    "scrub_reviewed_fingerprints_at_exact_listener_deadline",
+    "scrub_verified_evidence_on_physical_reject_or_listener_close",
+    "never_show_awaiting_touch_from_partial_or_mixed_sessions",
+    "no_server_side_touch_approval_from_network",
+    "one_device_signed_receipt_maximum_per_completed_transaction",
+    "never_set_paired_or_trusted_or_deployment_enabled"
+  ],
+  "hardware_required_before_production": [
+    "verify_real_nonce_patch1_SRP6a_and_AES_GCM_exchange",
+    "verify_real_live_signed_P256_transaction_and_transcript",
+    "verify_local_touch_review_and_signed_receipt",
+    "verify_reject_without_signature_on_physical_device",
+    "verify_expired_window_fails_closed_before_srp",
+    "verify_invalid_PIN_persistent_quota_without_implicit_reset",
+    "verify_real_reconnect_uses_new_srp_key_and_nonce",
+    "verify_downgrade_never_silently_falls_back_to_patch0",
+    "verify_firmware_rollback_and_NVS_configuration_retention",
+    "review_authenticated_capability_negotiation_before_trust"
+  ],
+  "environment_isolation": {
+    "do_not_modify_existing_patch0_lab": true,
+    "do_not_install_network_negative_testing_by_default": true,
+    "do_not_automatically_flash_device": true,
+    "do_not_store_pin_or_private_keys_in_logs": true,
+    "do_not_reset_persistent_attempt_quotas_over_network": true
+  },
+  "authorization": {
+    "laboratory_only": true,
+    "persistent_ha_trust_enabled": false,
+    "persistent_device_trust_enabled": false,
+    "pairing_enabled": false,
+    "configuration_deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_programming_enabled": false
+  }
+}
