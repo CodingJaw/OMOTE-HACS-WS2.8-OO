@@ -160,6 +160,36 @@ implementation reuses an AES-GCM nonce across messages. Any production
 enrollment design must replace/upgrade this with a verified unique
 nonce or monotonic counter on both peers before secrets/trust are enabled.
 
+## Isolated newer-toolchain patch-1 build candidate (NOT YET BUILT)
+
+Firmware feature branch now includes a separate
+`waveshare28v2_omote_sec2_tx_v2_nonce1_lab` target which pins the
+**matched** Tasmota 2026.10.50 platform, Arduino v3.3.12-1 and ESP-IDF
+5.5.5. The existing working Security2 v2 lab retains its older framework
+and code. The new target refuses to start its listener if the linked
+Security2 implementation does not advertise counter-nonce patch 1.
+
+This is explicitly **compile-first and not yet tested on a Waveshare**.
+The future protocol still needs authenticated downgrade resistance,
+nonce/replay/overflow handling and durable device identity approval.
+HACS receives only a read-only fixture contract, not a pairing service.
+
+The firmware-owned contract `sec2_nonce1_toolchain_candidate_contract.json`
+is mirrored in `tests/fixtures/sec2_nonce1_toolchain_candidate_contract.json`
+and pinned in CI. Offline HACS compatibility test:
+
+```bash
+python3 -m unittest discover -s tests \
+  -p 'test_sec2_nonce1_toolchain_candidate_contract.py' -v
+```
+
+The firmware repository's
+`docs/SEC2_NONCE1_IDF55_EXPERIMENTAL_MIGRATION.md` contains the
+compile-only target instructions, a **shallow sparse non-recursive**
+ESP-IDF Python checkout under `~/Documents/026code/esp-idf-nonce1`,
+and subsequent conditional hardware test. Do not flash the unverified
+toolchain or replace the working `esp-idf` checkout automatically.
+
 ## Still blocking production
 
 A live signed proof is still NOT pairing. Device key protection,
