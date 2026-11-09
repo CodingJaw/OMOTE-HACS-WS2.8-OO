@@ -264,6 +264,21 @@ jobs:
           assert all(not v for k,v in ha['authorization'].items() if k!='laboratory_only')
           assert ha['candidate']['board_build_and_runtime_not_yet_verified'] is True
           PY
+      - name: Verify pinned Security2 patch1 negative acceptance contract
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/38e0c759dfac5a2e86fb7915b781e0763d858a2c/Platformio/tools/config-v2-tests/sec2_nonce1_negative_acceptance_contract.json \
+            -o /tmp/omote-contract/sec2-nonce1-negative-acceptance.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          firmware=json.loads(Path('/tmp/omote-contract/sec2-nonce1-negative-acceptance.json').read_text())
+          hacs=json.loads(Path('tests/fixtures/sec2_nonce1_negative_acceptance_contract.json').read_text())
+          assert firmware==hacs, 'firmware/HACS nonce1 negative acceptance contract drift'
+          assert hacs['authorization']['laboratory_only'] is True
+          assert all(not val for key,val in hacs['authorization'].items() if key!='laboratory_only')
+          assert hacs['transport']['remote_version_advertisement_is_unauthenticated']
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
