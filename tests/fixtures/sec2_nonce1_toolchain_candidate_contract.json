@@ -1,0 +1,58 @@
+{
+  "contract": "omote-sec2-nonce1-toolchain-candidate-v1",
+  "scope": "experimental_build_only",
+  "current_verified_lab": {
+    "env": "waveshare28v2_omote_sec2_tx_v2_lab",
+    "platform_tag": "2025.03.30",
+    "security2_patch": 0,
+    "preserve_unchanged": true
+  },
+  "candidate": {
+    "env": "waveshare28v2_omote_sec2_tx_v2_nonce1_lab",
+    "extends": "waveshare28v2_omote_sec2_tx_v2_lab",
+    "platform_tag": "2026.10.50",
+    "platform_release_url": "https://github.com/tasmota/platform-espressif32/releases/download/2026.10.50/platform-espressif32.zip",
+    "arduino_core_tag": "v3.3.12-1",
+    "arduino_core_url": "https://github.com/tasmota/arduino-esp32/releases/download/v3.3.12-1/framework-arduinoespressif32.tar.xz",
+    "esp_idf": "5.5.5",
+    "esp_idf_platform_package_url": "https://github.com/tasmota/esp-idf/releases/download/v5.5.5/esp-idf-v5.5.5.tar.xz",
+    "security2_required_patch": 1,
+    "build_flag": "OMOTE_CONFIG_V2_SEC2_NONCE1_LAB",
+    "listener_must_refuse_if_linked_patch_is_not_1": true,
+    "source_clone_must_not_recurse_submodules": true,
+    "flash_after_compilation_only": true,
+    "board_build_and_runtime_not_yet_verified": true
+  },
+  "required_tests": [
+    "offline_nonce_audit_for_python_and_framework",
+    "exact_pio_environment_isolation",
+    "sequential_encrypted_request_response_nonce_uniqueness",
+    "wrong_direction_or_replayed_nonce_fails",
+    "invalid_authentication_tag_fails",
+    "counter_overflow_fails_closed",
+    "srp6a_aesgcm_hardware_handshake",
+    "mutual_p256_transcript_signatures",
+    "exact_transcript_bound_touchscreen_review",
+    "one_shot_device_signed_touch_receipt",
+    "closed_reopen_session_and_quota_failures",
+    "no_ha_admin_trust_or_config_deployment"
+  ],
+  "security_limitations": [
+    "newer_tasmota_idf_and_arduino_may_break_existing_omote_sources",
+    "counter_feature_is_necessary_not_sufficient_for_production",
+    "capability_advertisement_is_not_cryptographically_authenticated_until_session_binding",
+    "software_lab_device_key_is_not_hardware_attested",
+    "no_durable_trust_record_or_revocation",
+    "no_downgrade_fallback_allowed_in_any_future_production_mode"
+  ],
+  "authorization": {
+    "laboratory_only": true,
+    "device_paired": false,
+    "ha_paired": false,
+    "credentials_write_enabled": false,
+    "configuration_write_enabled": false,
+    "deployment_enabled": false,
+    "ota_enabled": false,
+    "efuse_changes_enabled": false
+  }
+}
