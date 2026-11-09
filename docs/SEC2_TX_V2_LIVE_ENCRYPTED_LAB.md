@@ -190,6 +190,35 @@ ESP-IDF Python checkout under `~/Documents/026code/esp-idf-nonce1`,
 and subsequent conditional hardware test. Do not flash the unverified
 toolchain or replace the working `esp-idf` checkout automatically.
 
+## Security2 patch-1 negative-case compatibility (2026-11-09)
+
+The user reports the positive ESP-IDF 5.5.5 Security2 patch-1
+laboratory tests passed. No full runtime log was supplied with the
+latest report. Firmware development now adds host-only lifecycle and
+cryptographic boundary tests for reconnect, replay, expiry, physical
+rejection, and new-session recovery. These do not authorize trust.
+
+Firmware contract:
+`Platformio/tools/config-v2-tests/sec2_nonce1_negative_acceptance_contract.json`
+
+HACS mirrored fixture:
+`tests/fixtures/sec2_nonce1_negative_acceptance_contract.json`
+
+Run the independent HACS contract test:
+
+```bash
+python3 -m unittest discover -s tests \
+  -p 'test_sec2_nonce1_negative_acceptance_contract.py' -v
+```
+
+No live Home Assistant Security2 enrollment endpoint is registered.
+The 60-second local review, 120-second listener, one-shot signed
+receipt and authenticated session properties remain *laboratory*
+acceptance gates. Firmware/HACS production pairing still needs explicit
+HA administrator consent, cryptographically protected downgrade
+negotiation, durable trust lifecycle and revocation, configuration
+write authorization and a tested recovery procedure.
+
 ## Still blocking production
 
 A live signed proof is still NOT pairing. Device key protection,
