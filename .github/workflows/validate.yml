@@ -219,6 +219,21 @@ jobs:
           assert hacs['authorization']['laboratory_only'] is True
           assert all(not enabled for key,enabled in hacs['authorization'].items() if key!='laboratory_only')
           PY
+      - name: Verify pinned firmware Security2 nonce requirements
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/CodingJaw/OMOTE-Firmware-WS2.8-OO/8b9a2515df4f4e0a5a2afa4dd38ea931d13f21d6/Platformio/tools/config-v2-tests/sec2_transport_nonce_requirements_v1.json \
+            -o /tmp/omote-contract/security2-nonce-policy.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          firmware=json.loads(Path('/tmp/omote-contract/security2-nonce-policy.json').read_text())
+          hacs=json.loads(Path('tests/fixtures/sec2_transport_nonce_requirements_v1.json').read_text())
+          assert firmware==hacs, 'Firmware/HACS Security2 nonce requirements drift'
+          assert hacs['nonce_policy']['production_pairing_must_reject_legacy_patch'] is True
+          assert hacs['authorization']['laboratory_only'] is True
+          assert all(not val for key,val in hacs['authorization'].items() if key!='laboratory_only')
+          PY
       - name: Compile Python modules
         run: python -m compileall -q custom_components tests
       - name: Validate configuration form serializer
