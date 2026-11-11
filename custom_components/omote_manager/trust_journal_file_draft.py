@@ -46,7 +46,7 @@ def _snapshot(journal: Journal) -> dict:
         raise TrustJournalError("invalid-journal-metadata")
     record = None if journal.record is None else validate_public_record(journal.record)
     if record is not None and (record["tx_id"] not in journal.used_txids
-                               or record["epoch"] > journal.max_epoch):
+                               or record["epoch"] != journal.max_epoch):
         raise TrustJournalError("journal-inconsistent")
     return {"version": FORMAT, "record": record, "used_txids": sorted(journal.used_txids),
             "max_epoch": journal.max_epoch}
@@ -77,7 +77,7 @@ def _decode(data: bytes) -> Journal:
         record = (None if doc["record"] is None
                   else validate_public_record(doc["record"]))
         if record is not None and (record["tx_id"] not in txids
-                                   or record["epoch"] > epoch):
+                                   or record["epoch"] != epoch):
             raise TrustJournalError("snapshot-consistency")
         return Journal(record=record, used_txids=frozenset(txids), max_epoch=epoch)
     except (UnicodeError, ValueError, TypeError, KeyError, OverflowError) as exc:
@@ -135,6 +135,15 @@ class OfflineJournalFile:
                 if (journal.record["tx_id"] != previous.record["tx_id"]
                         or journal.record["phase"] not in allowed[previous.record["phase"]]):
                     raise TrustJournalError("snapshot-phase-rollback")
+                for key in ("format", "device_id", "ha_key_sha256",
+                            "device_key_sha256", "device_key_protection", "epoch"):
+                    if journal.record[key] != previous.record[key]:
+                        raise TrustJournalError("snapshot-identity-changed")
+            elif (journal.max_epoch != previous.max_epoch + 1
+                  or previous.record["phase"] not in {"aborted", "revoked"}
+                  or journal.record["phase"] != "prepared"
+                  or journal.record["tx_id"] in previous.used_txids):
+                raise TrustJournalError("snapshot-invalid-next-transaction")
         payload = _encode(current)
         wire = _encode({"snapshot": current, "sha256": sha256(payload).hexdigest()})
         if len(wire) > MAX_BYTES:

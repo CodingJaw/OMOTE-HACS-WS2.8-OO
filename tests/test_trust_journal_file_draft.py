@@ -111,6 +111,30 @@ class OfflineFileJournalTests(unittest.TestCase):
                 record=None, used_txids=frozenset({"1"*32}), max_epoch=1))
         self.assertEqual(self.store.load().record["phase"], "prepared")
 
+    def test_identity_cannot_change_during_transaction(self):
+        self.store.save(state())
+        for key, replacement in (("device_id", "f" * 16),
+                                 ("ha_key_sha256", "e" * 64),
+                                 ("device_key_sha256", "d" * 64)):
+            changed = record(phase="commit_intent")
+            changed[key] = replacement
+            candidate = model.Journal(record=changed, max_epoch=1,
+                                      used_txids=frozenset({"1" * 32}))
+            with self.subTest(key=key), self.assertRaises(model.TrustJournalError):
+                self.store.save(candidate)
+        self.assertEqual(self.store.load().record, record())
+
+    def test_new_transaction_requires_terminal_phase_and_fresh_epoch_and_id(self):
+        self.store.save(state())
+        with self.assertRaises(model.TrustJournalError):
+            self.store.save(state(2, "prepared", "2" * 32, {"1" * 32, "2" * 32}))
+        self.store.save(state(1, "aborted"))
+        with self.assertRaises(model.TrustJournalError):
+            self.store.save(state(3, "prepared", "3" * 32, {"1" * 32, "3" * 32}))
+        with self.assertRaises(model.TrustJournalError):
+            self.store.save(state(2, "prepared", "1" * 32, {"1" * 32}))
+        self.store.save(state(2, "prepared", "2" * 32, {"1" * 32, "2" * 32}))
+
     def test_symlink_and_excessive_snapshot_rejected(self):
         actual = Path(self.temp.name) / "actual.json"
         actual.write_text("not a journal")

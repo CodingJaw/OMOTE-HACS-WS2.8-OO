@@ -76,7 +76,7 @@ class Journal:
                 raise TrustJournalError("outstanding-transaction")
             if d["phase"] != "prepared" or d["tx_id"] in self.used_txids:
                 raise TrustJournalError("transaction-replay")
-            if d["epoch"] <= self.max_epoch:
+            if d["epoch"] != self.max_epoch + 1:
                 raise TrustJournalError("epoch-rollback")
             if not (approved_on_both_devices and same_transcript):
                 raise TrustJournalError("missing-approvals-or-transcript")
