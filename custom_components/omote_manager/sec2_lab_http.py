@@ -17,6 +17,8 @@ import aiohttp
 _ALLOWED_ENDPOINTS = frozenset({
     "proto-ver", "prov-session", "omote-probe",
     "omote-ha-proof", "omote-device-proof",
+    "omote-tx2-open", "omote-tx2-commit", "omote-tx2-review",
+    "omote-tx2-touch-receipt",
 })
 _COOKIE = re.compile(r"session=(?:0|[1-9][0-9]{0,9})\Z", re.ASCII)
 _MAX_RESPONSE_BYTES = 4096

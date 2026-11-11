@@ -1,8 +1,8 @@
 """Isolated, opt-in Security2 LAB interoperability orchestrator.
 
-Not registered by OMOTE Manager, not a WebSocket or service, and NEVER
-production pairing. A caller must explicitly provide the official ESP-IDF
-Security2/Transport_HTTP implementations and a locally displayed PIN.
+The v2 diagnostic is reachable only through an admin-only, default-off LAB
+WebSocket. It is NEVER production pairing. Callers supply the bundled
+Security2 implementation, scoped transport and a locally displayed PIN.
 Only fixed, unprivileged LAB endpoints on port 18082 are accessed.
 
 The Waveshare software device key is NOT hardware protected. Its verified
@@ -182,3 +182,106 @@ async def run_lab_session(
                 connection = getattr(transport, "conn", None)
                 if connection is not None:
                     connection.close()
+
+
+async def run_tx2_lab_session(
+    *, host: str, pin: str, entry_id: str, identities: CandidateIdentityStore,
+    security_factory, transport_factory, ack_lab_only: bool = False,
+) -> dict:
+    """Exercise saved HA key and physical review on patch-1 LAB firmware.
+
+    This is diagnostic only: the device key is untrusted, no credentials are
+    persisted, and no reconnect, pairing, deployment or OTA is authorized.
+    """
+    from .sec2_tx_v2_lab import LabV2Transaction
+
+    if ack_lab_only is not True:
+        raise LabSessionError("explicit-lab-consent")
+    try:
+        ipaddress.IPv4Address(host)
+        if type(pin) is not str or re.fullmatch(r"[0-9]{6}", pin) is None:
+            raise ValueError("Invalid PIN")
+        prepared = identities.status(entry_id)
+        if not prepared["prepared"] or prepared["trusted"]:
+            raise ValueError("Missing candidate")
+    except (ValueError, CandidateIdentityError, KeyError, TypeError):
+        raise LabSessionError("local-preflight") from None
+
+    stage = "transport"
+    transport = None
+
+    async def bounded(endpoint, payload):
+        reply = await asyncio.wait_for(
+            transport.send_data(endpoint, payload), timeout=_LAB_TIMEOUT_SECONDS)
+        if type(reply) is not str or len(reply) > _LAB_RESPONSE_MAX:
+            raise ValueError("Invalid LAB response")
+        return reply
+
+    async def exchange():
+        nonlocal stage, transport
+        transport = transport_factory(f"{host}:{_LAB_PORT}")
+        stage = "version"
+        metadata = json.loads(await bounded("proto-ver", "-"))["prov"]
+        if (type(metadata) is not dict or metadata.get("ver") != _LAB_VERSION
+                or type(metadata.get("sec_patch_ver")) is not int
+                or metadata["sec_patch_ver"] != 1):
+            raise ValueError("Patch-1 laboratory firmware required")
+        stage = "security2"
+        security = security_factory(sec_patch_ver=1, username="omote-ha",
+                                    password=pin, verbose=False)
+        response = None
+        for _ in range(4):
+            request = security.security_session(response)
+            if request is None:
+                break
+            response = await bounded("prov-session", request)
+        else:
+            raise ValueError("Security2 frame limit")
+
+        async def encrypted(endpoint, payload):
+            request = security.encrypt_data(payload).decode("latin-1")
+            reply = await bounded(endpoint, request)
+            return security.decrypt_data(reply.encode("latin-1"))
+
+        stage = "encrypted-probe"
+        if await encrypted("omote-probe", b"OMOTE-SEC2-PROBE-V1") != b"OMOTE-SEC2-OK-V1":
+            raise ValueError("Probe failed")
+        stage = "transaction-open"
+        tx = LabV2Transaction(transport.headers.get("Cookie", ""), identities, entry_id)
+        if sha256(tx._ha_pub).hexdigest() != prepared["fingerprint"]:
+            raise ValueError("Candidate identity changed")
+        opened = await encrypted("omote-tx2-open", tx.open_request())
+        stage = "transaction-commit"
+        commit = await encrypted("omote-tx2-commit", tx.commit_request(opened))
+        tx.check_commit(commit)
+        fingerprints = tx.verified_public_fingerprints()
+        stage = "touch-review"
+        # Physical review is bounded independently; no retries of failed calls.
+        deadline = asyncio.get_running_loop().time() + 45
+        while asyncio.get_running_loop().time() < deadline:
+            reply = await encrypted("omote-tx2-review", tx.review_request())
+            if tx.check_review_reply(reply):
+                break
+            await asyncio.sleep(1)
+        else:
+            raise ValueError("Touch review expired")
+        stage = "touch-receipt"
+        receipt = await encrypted("omote-tx2-touch-receipt", tx.touch_receipt_request())
+        tx.check_touch_receipt_reply(receipt)
+        return {
+            "lab_only": True,
+            "encrypted_probes_passed": True,
+            "touch_receipt_verified": True,
+            "candidate_ha_fingerprint": fingerprints["ha"],
+            "untrusted_device_fingerprint": fingerprints["device"],
+            "trusted": False, "paired": False,
+            "deployment_enabled": False, "ota_enabled": False,
+        }
+
+    try:
+        return await asyncio.wait_for(exchange(), timeout=75)
+    except Exception:
+        raise LabSessionError(stage) from None
+    finally:
+        if transport is not None:
+            await transport.aclose()

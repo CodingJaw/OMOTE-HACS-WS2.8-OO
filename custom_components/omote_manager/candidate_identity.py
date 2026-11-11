@@ -145,6 +145,8 @@ class CandidateIdentityStore:
 
     async def async_load(self) -> None:
         async with self._lock:
+            if self._load_error != "not_loaded":
+                raise CandidateIdentityError("Candidate store already loaded or unavailable")
             try:
                 raw = await self._store.async_load()
                 self._state = _blank() if raw is None else _validate_state(raw)
@@ -181,12 +183,17 @@ class CandidateIdentityStore:
                 raise CandidateIdentityError("Unable to generate candidate P-256 key") from None
             next_state = deepcopy(self._state)
             next_state["identities"][entry_id] = record
+            # An interrupted save can have reached disk even if it raises or
+            # the task is cancelled. Latch the store before awaiting so a
+            # retry cannot silently replace that potentially persisted key.
+            self._load_error = "candidate_identity_storage_unavailable"
             try:
                 await self._store.async_save(next_state)
             except Exception:
-                # Do not publish an unsaved identity; do not log private data.
+                # Restart and reload the store before attempting recovery.
                 raise CandidateIdentityError("Unable to save candidate identity") from None
             self._state = next_state
+            self._load_error = None
             return {**_status(record), "created": True}
 
     def make_lab_ha_proof(
@@ -213,3 +220,27 @@ class CandidateIdentityStore:
         if not 8 <= len(signature) <= 80:
             raise CandidateIdentityError("Unexpected signature encoding")
         return b"\x01" + public + nonce + len(signature).to_bytes(2, "big") + signature
+
+    def lab_tx2_public(self, entry_id: str) -> bytes:
+        """Return the candidate public key for the isolated v2 laboratory."""
+        if self._load_error is not None:
+            raise CandidateIdentityError("Candidate key storage unavailable")
+        record = self._state["identities"].get(entry_id)
+        if record is None:
+            raise CandidateIdentityError("No prepared candidate identity")
+        return _public_bytes(_read_record(record))
+
+    def lab_tx2_sign(self, entry_id: str, context: dict) -> bytes:
+        """Sign only a valid v2 LAB transaction containing this identity."""
+        from .sec2_mutual_transaction_proof_v2_draft import HA_DOMAIN, canonical_context
+        if self._load_error is not None:
+            raise CandidateIdentityError("Candidate key storage unavailable")
+        record = self._state["identities"].get(entry_id)
+        if record is None:
+            raise CandidateIdentityError("No prepared candidate identity")
+        key = _read_record(record)
+        if context.get("ha_public_sec1_hex") != _public_bytes(key).hex():
+            raise CandidateIdentityError("LAB candidate key mismatch")
+        message = HA_DOMAIN + canonical_context(context)
+        hashes, _, ec = _crypto()
+        return key.sign(message, ec.ECDSA(hashes.SHA256()))

@@ -58,7 +58,7 @@ def load_handler():
         (".sec2_lab_http", {"LabHttpTransport": object}),
         (".sec2_lab_session", {
             "LabSessionError": type("LabSessionError", (RuntimeError,), {}),
-            "run_lab_session": None,
+            "run_tx2_lab_session": None,
         }),
     ):
         sub = types.ModuleType(PACKAGE + name)
@@ -212,7 +212,7 @@ class LabWebSocketTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"OMOTE_SEC2_LAB_ENABLE": "1", "IDF_PATH": "/fake"}):
             hass, conn = HA(), Connection()
             with patch.object(lab, "load_official_security2", return_value=object), \
-                    patch.object(lab, "run_lab_session", side_effect=fake_runner):
+                    patch.object(lab, "run_tx2_lab_session", side_effect=fake_runner):
                 await lab.ws_lab_test(hass, conn, self.request)
             self.assertFalse(conn.errors)
             self.assertEqual(len(conn.results), 1)

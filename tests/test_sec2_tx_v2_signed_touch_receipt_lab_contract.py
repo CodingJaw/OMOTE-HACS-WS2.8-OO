@@ -43,8 +43,9 @@ class SignedTouchLabWireContractTests(unittest.TestCase):
         self.assertTrue(all(not enabled for key,enabled in permission.items()
                             if key != "laboratory_only"))
         integration=ROOT/"custom_components/omote_manager"
-        for file in integration.glob("*.py"):
-            self.assertNotIn("omote-tx2-touch-receipt",file.read_text(),file.name)
+        users = {file.name for file in integration.glob("*.py")
+                 if "omote-tx2-touch-receipt" in file.read_text()}
+        self.assertEqual(users, {"sec2_lab_http.py", "sec2_lab_session.py"})
 
 
 if __name__=="__main__":

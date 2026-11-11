@@ -20,7 +20,7 @@ from .candidate_identity_ws import IDENTITY_STORE_KEY
 from .const import DOMAIN
 from .sec2_lab_espidf import LabPrerequisiteError, load_official_security2
 from .sec2_lab_http import LabHttpTransport
-from .sec2_lab_session import LabSessionError, run_lab_session
+from .sec2_lab_session import LabSessionError, run_tx2_lab_session
 
 _LAB_LOCKS_KEY = f"{DOMAIN}_security2_lab_locks"
 _PIN = re.compile(r"[0-9]{6}\Z", re.ASCII)
@@ -151,7 +151,7 @@ async def ws_lab_test(hass: HomeAssistant, connection, msg: dict):
             # Import the official source only after admin, entry and PIN
             # preflight. No listener is opened on HA and no keys are created.
             official_security2 = load_official_security2()
-            result = await run_lab_session(
+            result = await run_tx2_lab_session(
                 host=host, pin=msg["pin"], entry_id=entry.entry_id,
                 identities=identities, security_factory=official_security2,
                 transport_factory=LabHttpTransport, ack_lab_only=True,

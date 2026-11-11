@@ -43,7 +43,7 @@ class OmoteManagerPanel extends HTMLElement {
     if (this._mounted) return;
     this._mounted = true;
     this.shadowRoot.innerHTML =
-      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev24">' +
+      '<link rel="stylesheet" href="/omote_manager_static/panel.css?v=0.1.0-dev25">' +
       '<div class="shell">' +
       '  <header class="masthead">' +
       '    <div><p class="eyebrow">HOME ASSISTANT / OMOTE</p><h1>OMOTE Manager</h1>' +
@@ -154,7 +154,7 @@ class OmoteManagerPanel extends HTMLElement {
   async _loadStudio() {
     const state = this.shadowRoot.getElementById("studio-load-state");
     try {
-      const module = await import("./workspace-panel.js?v=0.1.0-dev24");
+      const module = await import("./workspace-panel.js?v=0.1.0-dev25");
       if (!this._mounted) return;
       if (typeof module.attachWorkspace !== "function") {
         throw new Error("Profile Studio module has no initializer");
@@ -662,7 +662,7 @@ class OmoteManagerPanel extends HTMLElement {
     const request = ++this._labRequest;
     const status = this.shadowRoot.getElementById("lab-status");
     button.disabled = true;
-    status.textContent = "Performing a single encrypted LAB exchange. Do not repeat unnecessarily…";
+    status.textContent = "Performing the LAB exchange. Compare the HA fingerprint shown above with the remote, then tap Review OK or Reject on the remote…";
     try {
       const result = await this._hass.callWS({
         type: "omote_manager/pairing/lab/test", entry_id: remote.entry_id,
@@ -671,11 +671,11 @@ class OmoteManagerPanel extends HTMLElement {
       if (request !== this._labRequest ||
           remote.entry_id !== this._selectedRemote) return;
       status.textContent =
-        "LAB ONLY: encrypted probe and session-bound identity proofs passed. " +
+        "LAB ONLY: encrypted probe, identity proofs and signed touchscreen review passed. " +
         "HA public fingerprint: " + result.candidate_ha_fingerprint +
         ". Untrusted Waveshare software-key fingerprint: " +
         result.untrusted_device_fingerprint +
-        ". Compare the HA fingerprint with all four rows on the Waveshare, then use Review OK or Reject. " +
+        ". The touchscreen review was verified during this session. " +
         "NOT PAIRED; no trusted credential, config deployment, OTA or eFuse changes.";
     } catch (_error) {
       if (request !== this._labRequest ||

@@ -1,7 +1,6 @@
 """Read-only, authenticated v2 touchscreen-review LAB protocol parity checks.
 
-HACS does not open any Security2 lab session, register this endpoint or
-interpret a local-only Review OK as permanent pairing authorization.
+The opt-in HACS diagnostic does not interpret Review OK as pairing.
 """
 from __future__ import annotations
 
@@ -42,11 +41,11 @@ class LocalReviewLabContractTests(unittest.TestCase):
             self.assertIn(required, constraints)
 
     def test_lab_only_not_registered_as_hacs_deploy_path(self):
-        # A mirrored contract fixture is metadata, not a live endpoint.
+        # Only the isolated transport and session may reference this endpoint.
         integration = ROOT / "custom_components/omote_manager"
-        for path in integration.glob("*.py"):
-            content = path.read_text()
-            self.assertNotIn('omote-tx2-review', content, path.name)
+        users = {path.name for path in integration.glob("*.py")
+                 if 'omote-tx2-review' in path.read_text()}
+        self.assertEqual(users, {"sec2_lab_http.py", "sec2_lab_session.py"})
 
 
 if __name__ == "__main__":

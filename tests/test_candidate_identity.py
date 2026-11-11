@@ -156,8 +156,47 @@ class CandidateIdentityTests(unittest.TestCase):
         store, _ = self._store(backing)
         with self.assertRaises(identity.CandidateIdentityError):
             asyncio.run(store.async_prepare(self.ENTRY))
-        self.assertFalse(store.status(self.ENTRY)["prepared"])
+        with self.assertRaises(identity.CandidateIdentityError):
+            store.status(self.ENTRY)
+        with self.assertRaises(identity.CandidateIdentityError):
+            asyncio.run(store.async_prepare(self.ENTRY))
         self.assertEqual(backing.saves, 0)
+
+    def test_save_error_after_write_does_not_rotate_persisted_key(self):
+        class LateFailure(FakeHAStore):
+            async def async_save(self, state):
+                await super().async_save(state)
+                raise OSError("failure after write")
+
+        backing = LateFailure()
+        store, _ = self._store(backing)
+        with self.assertRaises(identity.CandidateIdentityError):
+            asyncio.run(store.async_prepare(self.ENTRY))
+        fingerprint = backing.raw["identities"][self.ENTRY]["fingerprint"]
+        with self.assertRaises(identity.CandidateIdentityError):
+            asyncio.run(store.async_prepare(self.ENTRY))
+        with self.assertRaises(identity.CandidateIdentityError):
+            asyncio.run(store.async_load())
+        self.assertEqual(backing.saves, 1)
+        restarted, _ = self._store(backing)
+        self.assertEqual(restarted.status(self.ENTRY)["fingerprint"], fingerprint)
+        self.assertFalse(asyncio.run(restarted.async_prepare(self.ENTRY))["created"])
+
+    def test_cancelled_save_latches_store_until_restart(self):
+        class CancelledSave(FakeHAStore):
+            async def async_save(self, state):
+                await super().async_save(state)
+                raise asyncio.CancelledError()
+
+        backing = CancelledSave()
+        store, _ = self._store(backing)
+        with self.assertRaises(asyncio.CancelledError):
+            asyncio.run(store.async_prepare(self.ENTRY))
+        with self.assertRaises(identity.CandidateIdentityError):
+            asyncio.run(store.async_prepare(self.ENTRY))
+        self.assertEqual(backing.saves, 1)
+        restarted, _ = self._store(backing)
+        self.assertTrue(restarted.status(self.ENTRY)["prepared"])
 
     def test_invalid_input_cannot_create_storage(self):
         store, backing = self._store()
