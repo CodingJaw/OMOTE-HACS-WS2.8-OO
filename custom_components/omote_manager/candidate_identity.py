@@ -145,6 +145,8 @@ class CandidateIdentityStore:
 
     async def async_load(self) -> None:
         async with self._lock:
+            if self._load_error != "not_loaded":
+                raise CandidateIdentityError("Candidate store already loaded or unavailable")
             try:
                 raw = await self._store.async_load()
                 self._state = _blank() if raw is None else _validate_state(raw)
@@ -181,12 +183,17 @@ class CandidateIdentityStore:
                 raise CandidateIdentityError("Unable to generate candidate P-256 key") from None
             next_state = deepcopy(self._state)
             next_state["identities"][entry_id] = record
+            # An interrupted save can have reached disk even if it raises or
+            # the task is cancelled. Latch the store before awaiting so a
+            # retry cannot silently replace that potentially persisted key.
+            self._load_error = "candidate_identity_storage_unavailable"
             try:
                 await self._store.async_save(next_state)
             except Exception:
-                # Do not publish an unsaved identity; do not log private data.
+                # Restart and reload the store before attempting recovery.
                 raise CandidateIdentityError("Unable to save candidate identity") from None
             self._state = next_state
+            self._load_error = None
             return {**_status(record), "created": True}
 
     def make_lab_ha_proof(
